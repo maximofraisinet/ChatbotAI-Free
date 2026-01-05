@@ -1,0 +1,19 @@
+# Voice Chatbot Requirements
+# Install with: pip install -r requirements.txt
+
+# GUI
+PyQt6>=6.6.0
+
+# Audio
+sounddevice>=0.4.6
+numpy>=1.24.0
+
+# Speech-to-Text (faster-whisper)
+faster-whisper>=0.10.0
+
+# LLM (Ollama)
+ollama>=0.1.0
+
+# Text-to-Speech (Kokoro ONNX)
+kokoro-onnx>=0.1.0  # Official Kokoro TTS library
+onnxruntime-gpu>=1.16.0  # Use onnxruntime-gpu for CUDA support
