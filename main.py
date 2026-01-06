@@ -447,7 +447,9 @@ class MainWindow(QMainWindow):
         """Interrupt the bot while speaking"""
         if self.worker_thread and self.worker_thread.isRunning():
             self.worker_thread.interrupt()
-            self.worker_thread.wait()  # Wait for thread to finish
+            # Wait with timeout to avoid blocking
+            if not self.worker_thread.wait(1000):  # Wait max 1 second
+                print("⚠️ Thread didn't finish in time, forcing cleanup")
             self.status_label.setText("Ready")
             self.is_speaking = False
             self.is_processing = False

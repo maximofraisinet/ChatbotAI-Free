@@ -163,6 +163,7 @@ class AudioPlayer:
     def __init__(self, sample_rate=24000):
         self.sample_rate = sample_rate
         self.is_playing = False
+        self.should_stop = False
     
     def play(self, audio_data, sample_rate=None):
         """
@@ -178,6 +179,7 @@ class AudioPlayer:
             actual_rate = self.sample_rate
             
         self.is_playing = True
+        self.should_stop = False
         
         try:
             # Ensure audio is float32 and in range [-1, 1]
@@ -195,9 +197,16 @@ class AudioPlayer:
             print(f"Audio range: [{audio_data.min():.3f}, {audio_data.max():.3f}]")
             
             sd.play(audio_data, actual_rate)
-            sd.wait()  # Wait until playback is finished
             
-            print("Audio playback finished")
+            # Wait in small increments so we can check for stop signal
+            import time
+            while sd.get_stream().active and not self.should_stop:
+                time.sleep(0.1)
+            
+            if self.should_stop:
+                print("Audio playback interrupted")
+            else:
+                print("Audio playback finished")
             
         except Exception as e:
             print(f"Playback error: {e}")
@@ -205,8 +214,10 @@ class AudioPlayer:
             traceback.print_exc()
         finally:
             self.is_playing = False
+            self.should_stop = False
     
     def stop(self):
         """Stop current playback"""
+        self.should_stop = True
         sd.stop()
         self.is_playing = False
