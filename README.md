@@ -74,13 +74,35 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-5. **Install an Ollama model:**
+5. **Download required model files:**
+
+⚠️ **Important**: These files are too large for GitHub (310+ MB) and must be downloaded separately.
+
+- **Kokoro TTS Model** (`kokoro-v0_19.onnx`):
+  - Download from: [Kokoro-82M releases](https://github.com/thewh1teagle/kokoro-onnx/releases)
+  - Place in the project root folder
+
+- **Voice Configurations** (`voices.json`):
+  - Download from: [Kokoro-82M releases](https://github.com/thewh1teagle/kokoro-onnx/releases)
+  - Place in the project root folder
+
+Your folder structure should look like:
+```
+ChatbotAI-English/
+├── main.py
+├── ai_manager.py
+├── ...
+├── kokoro-v0_19.onnx    ← Download this
+└── voices.json           ← Download this
+```
+
+6. **Install an Ollama model:**
 ```bash
 ollama pull llama3.1:8b
 # or try other models: mistral, gemma2, etc.
 ```
 
-6. **Run the application:**
+7. **Run the application:**
 ```bash
 python main.py
 ```
@@ -114,12 +136,24 @@ venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-7. **Install an Ollama model:**
+7. **Download required model files:**
+
+⚠️ **Important**: These files are too large for GitHub and must be downloaded separately.
+
+- **Kokoro TTS Model** (`kokoro-v0_19.onnx`):
+  - Download from: [Kokoro-82M releases](https://github.com/thewh1teagle/kokoro-onnx/releases)
+  - Place in the project folder
+
+- **Voice Configurations** (`voices.json`):
+  - Download from: [Kokoro-82M releases](https://github.com/thewh1teagle/kokoro-onnx/releases)
+  - Place in the project folder
+
+8. **Install an Ollama model:**
 ```cmd
 ollama pull llama3.1:8b
 ```
 
-8. **Run the application:**
+9. **Run the application:**
 ```cmd
 python main.py
 ```

@@ -55,10 +55,9 @@ user_preferences.json
 # PyCharm
 .idea/
 
-# AI Models (large files)
-# Uncomment if you don't want to track these models
-# *.onnx
-# voices.json
+# AI Models (large files - too big for GitHub)
+*.onnx
+voices.json
 
 # Faster-whisper cache
 ~/.cache/huggingface/
