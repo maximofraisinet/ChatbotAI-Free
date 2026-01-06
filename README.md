@@ -9,6 +9,12 @@ I created this chatbot as a personal tool to:
 - **Learn more** about AI integration, speech processing, and UI development
 - Experiment with real-time streaming and voice activity detection
 
+<img width="1082" height="799" alt="Captura de pantalla_20260106_172859" src="https://github.com/user-attachments/assets/0030e384-f9c8-47ee-aa90-2c4a955bc27b" />
+Normal mode
+
+<img width="1083" height="799" alt="Captura de pantalla_20260106_172956" src="https://github.com/user-attachments/assets/33e8d5dc-4310-4248-ba22-4b16085958b9" />
+Live mode
+
 ## Features ✨
 
 ### 🎯 Dual Mode Interface
@@ -81,10 +87,16 @@ pip install -r requirements.txt
 - **Kokoro TTS Model** (`kokoro-v0_19.onnx`):
   - Download from: [Kokoro-82M releases](https://github.com/thewh1teagle/kokoro-onnx/releases)
   - Place in the project root folder
+```bash
+wget https://huggingface.co/thewh1teagle/Kokoro/resolve/main/kokoro-v0_19.onnx
+```
 
 - **Voice Configurations** (`voices.json`):
   - Download from: [Kokoro-82M releases](https://github.com/thewh1teagle/kokoro-onnx/releases)
   - Place in the project root folder
+```bash
+wget https://huggingface.co/thewh1teagle/Kokoro/resolve/main/voices.json
+```
 
 Your folder structure should look like:
 ```
@@ -203,27 +215,3 @@ ChatbotAI-English/
 ## License 📄
 
 MIT License
-
-Copyright (c) 2026
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
----
-
-**Made with ❤️ for English learning and AI exploration**
