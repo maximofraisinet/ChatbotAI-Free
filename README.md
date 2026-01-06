@@ -1,206 +1,195 @@
-# Voice Chatbot - Local AI Assistant 🎙️🤖
+# Voice Chatbot - AI English Practice Assistant 🎙️🤖
 
-A fully local voice chatbot powered by AI, featuring real-time speech-to-text, LLM conversation, and text-to-speech synthesis. Optimized for AMD Ryzen 7 + NVIDIA RTX 4060 (8GB VRAM).
+A fully local voice chatbot with two conversation modes: **Classic Chat** and **Live Mode**. Built to help practice English conversation skills through natural AI interactions.
+
+## About This Project 💡
+
+I created this chatbot as a personal tool to:
+- **Practice my English** through realistic conversations
+- **Learn more** about AI integration, speech processing, and UI development
+- Experiment with real-time streaming and voice activity detection
 
 ## Features ✨
 
-- **🎤 Real-time Voice Input**: Continuous listening with Voice Activity Detection (VAD)
-- **🧠 Smart Conversations**: Powered by Llama3 via Ollama
-- **🔊 Natural Speech Output**: High-quality TTS with Kokoro ONNX
-- **🎨 Modern Dark UI**: WhatsApp/iMessage-style chat bubbles
-- **⚡ Multi-threaded**: Non-blocking UI with efficient resource usage
-- **🔁 Feedback Prevention**: Automatic microphone muting during bot speech
+### 🎯 Dual Mode Interface
+- **Classic Chat Mode**: Traditional message-by-message conversation with text input and voice recording
+- **Live Mode**: Continuous hands-free conversation with real-time barge-in (interrupt the AI anytime by speaking)
 
-## Architecture 🏗️
+### 🗣️ Voice Capabilities
+- Real-time speech-to-text (Whisper)
+- Natural text-to-speech output (Kokoro ONNX)
+- Voice Activity Detection (VAD) for automatic silence detection
 
-```
-┌─────────────────────────────────────────────┐
-│            PyQt6 GUI (Main Thread)          │
-│  - Chat bubbles (user/bot)                  │
-│  - Status indicator                         │
-│  - Control buttons                          │
-└──────────────┬──────────────────────────────┘
-               │
-       ┌───────┴───────┐
-       │               │
-┌──────▼───────┐ ┌────▼──────────┐
-│   Listener   │ │    Worker     │
-│    Thread    │ │    Thread     │
-│              │ │               │
-│ - Mic input  │ │ - Transcribe  │
-│ - VAD        │ │ - LLM         │
-│              │ │ - TTS         │
-│              │ │ - Playback    │
-└──────────────┘ └───────────────┘
-```
+### 🧠 AI Features
+- Local LLM conversations powered by Ollama (Llama, Mistral, etc.)
+- **Streaming responses** - See and hear AI responses as they're generated
+- Conversation history with context awareness
+
+### 🎨 Modern UI
+- Dark theme inspired by Google Gemini
+- Responsive chat bubbles
+- Customizable font sizes (small, medium, large)
+- Live Mode with pulsing visual indicator
+
+### ⚡ Smart Features
+- Barge-in detection - Interrupt the AI naturally by speaking
+- User preferences saved locally (model, font size, auto-send mode)
+- Multi-threaded for smooth performance
 
 ## Installation 📦
 
-### 1. Prerequisites
+### Prerequisites
 
-- **Python**: 3.10 or 3.11 (recommended)
-- **CUDA**: 11.8+ for GPU acceleration
-- **Ollama**: Installed and running ([Download here](https://ollama.ai))
+**All Systems:**
+- **Python 3.10 or 3.11**
+- **Ollama** - Download from [ollama.ai](https://ollama.ai)
 
-### 2. Install Ollama Model
+### Linux Installation 🐧
 
+1. **Install system dependencies:**
 ```bash
-ollama pull llama3
+# Ubuntu/Debian
+sudo apt update
+sudo apt install python3 python3-pip portaudio19-dev
+
+# Arch Linux
+sudo pacman -S python python-pip portaudio
 ```
 
-### 3. Python Dependencies
+2. **Clone or download this repository:**
+```bash
+cd ~/your-projects-folder
+git clone <your-repo-url>
+cd ChatbotAI-English
+```
 
+3. **Create virtual environment (recommended):**
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+4. **Install Python dependencies:**
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Model Files Setup
-
-Place the following files in the project root directory:
-
-```
-ChatbotAI-English/
-├── kokoro-v0_19.onnx    # Kokoro TTS model (already present)
-├── voices.json           # Voice configurations (already present)
-├── main.py
-├── ai_manager.py
-├── audio_utils.py
-├── styles.py
-└── requirements.txt
+5. **Install an Ollama model:**
+```bash
+ollama pull llama3.1:8b
+# or try other models: mistral, gemma2, etc.
 ```
 
-**Note**: The `kokoro-v0_19.onnx` and `voices.json` files should already be in your workspace.
-
-## Usage 🚀
-
-### Run the Application
-
+6. **Run the application:**
 ```bash
 python main.py
 ```
 
-### How It Works
+### Windows Installation 🪟
 
-1. **Click "Start Listening"** (or wait for auto-start)
-2. **Speak into your microphone** in English
-3. **The bot will**:
-   - Transcribe your speech (Whisper)
-   - Process with Llama3 (Ollama)
-   - Generate voice response (Kokoro)
-   - Play the audio back
-4. **Repeat**: The bot continues listening after speaking
+1. **Install Python:**
+   - Download Python 3.11 from [python.org](https://www.python.org/downloads/)
+   - ✅ **Important**: Check "Add Python to PATH" during installation
 
-### Controls
+2. **Install Ollama:**
+   - Download from [ollama.ai](https://ollama.ai)
+   - Run the installer
 
-- **Start Listening**: Begin voice interaction
-- **Stop**: Pause all processing
-- **Clear Chat**: Reset conversation history
+3. **Download this project:**
+   - Download as ZIP or clone with Git
+   - Extract to a folder like `C:\Users\YourName\ChatbotAI-English`
 
-## Configuration ⚙️
+4. **Open Command Prompt in the project folder:**
+   - Navigate to the folder in File Explorer
+   - Type `cmd` in the address bar and press Enter
 
-### Adjust Models (in `ai_manager.py`)
-
-```python
-ai_manager = AIManager(
-    whisper_model="base.en",      # Options: tiny.en, base.en, small.en
-    ollama_model="llama3",         # Any Ollama model
-    voice_name="af_bella"          # Options: af_bella, af_sarah
-)
+5. **Create virtual environment (recommended):**
+```cmd
+python -m venv venv
+venv\Scripts\activate
 ```
 
-### Adjust VAD Sensitivity (in `audio_utils.py`)
-
-```python
-recorder = AudioRecorder(
-    silence_threshold=0.015,   # Lower = more sensitive
-    silence_duration=1.5       # Seconds of silence before stop
-)
+6. **Install dependencies:**
+```cmd
+pip install -r requirements.txt
 ```
 
-### Change UI Colors (in `styles.py`)
+7. **Install an Ollama model:**
+```cmd
+ollama pull llama3.1:8b
+```
 
-Modify the `DARK_STYLE` CSS variables:
-- Background: `#121212`
-- User bubble: `#005C4B`
-- Bot bubble: `#1F1F1F`
+8. **Run the application:**
+```cmd
+python main.py
+```
+
+## Usage 🚀
+
+### Classic Chat Mode
+1. Type messages or use the 🎤 microphone button
+2. Press ⏹ while recording to send
+3. Choose between auto-send or manual review mode in settings (⚙️)
+
+### Live Mode (Continuous Conversation)
+1. Click the ✨ button to enter Live Mode
+2. Speak naturally - the AI listens continuously
+3. Interrupt anytime by speaking over the AI
+4. Use 🎤 to mute your input (AI keeps speaking)
+5. Click ✕ to return to Chat Mode
+
+### Settings ⚙️
+- **Font Size**: Small, Medium, or Large
+- **Voice Mode**: Auto-send after recording or Manual review
+- **Model Selection**: Switch between available Ollama models
+
+## Technologies Used 🛠️
+
+- **Python & PyQt6** - Application framework and UI
+- **Whisper** (via faster-whisper) - Speech-to-text
+- **Ollama** (streaming mode) - Local LLM inference
+- **Kokoro ONNX** - Text-to-speech synthesis
+- **PyAudio/sounddevice** - Audio I/O
+- **NumPy** - Audio processing
 
 ## Project Structure 📁
 
 ```
-├── main.py              # Main application & GUI logic
-├── ai_manager.py        # AI model management (Whisper, Ollama, Kokoro)
-├── audio_utils.py       # Audio recording & playback with VAD
-├── styles.py            # PyQt6 QSS dark theme styles
-├── requirements.txt     # Python dependencies
-├── README.md            # This file
-├── kokoro-v0_19.onnx   # Kokoro TTS model
-└── voices.json          # Voice configurations
+ChatbotAI-English/
+├── main.py              # Main application & UI
+├── ai_manager.py        # AI model coordination (Whisper, Ollama, Kokoro)
+├── audio_utils.py       # Audio recording and playback
+├── styles.py            # UI styling (Gemini-inspired dark theme)
+├── preferences.py       # User settings persistence
+├── kokoro-v0_19.onnx   # TTS model
+├── voices.json          # Voice configurations
+└── requirements.txt     # Python dependencies
 ```
-
-## Performance Tips 🎯
-
-### For 8GB VRAM
-
-- Use `base.en` or `small.en` for Whisper (not `medium` or `large`)
-- Keep conversation history to 10 messages max (already configured)
-- Close other GPU-intensive applications
-
-### Troubleshooting
-
-**GPU Not Detected**:
-```bash
-# Check CUDA availability
-python -c "import torch; print(torch.cuda.is_available())"
-```
-
-**Ollama Connection Error**:
-```bash
-# Ensure Ollama is running
-ollama list
-```
-
-**Microphone Not Working**:
-```bash
-# Test audio devices
-python -c "import sounddevice as sd; print(sd.query_devices())"
-```
-
-## Technical Details 🔧
-
-### Audio Pipeline
-
-- **Input**: 16 kHz, mono, float32
-- **VAD**: RMS-based energy detection
-- **Feedback Prevention**: Microphone paused during TTS playback
-
-### AI Models
-
-- **STT**: faster-whisper (base.en) on CUDA with FP16
-- **LLM**: Ollama llama3 with streaming disabled
-- **TTS**: Kokoro ONNX (24 kHz output) on CUDA
-
-### Threading Model
-
-- **Main Thread**: UI updates only (PyQt6)
-- **Listener Thread**: Continuous audio capture
-- **Worker Thread**: STT → LLM → TTS pipeline
 
 ## License 📄
 
-This project uses various open-source models and libraries. Please review individual licenses:
+MIT License
 
-- **faster-whisper**: MIT License
-- **Ollama**: MIT License
-- **Kokoro TTS**: Check model provider's license
-- **PyQt6**: GPL v3
+Copyright (c) 2026
 
-## Credits 👏
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-- **Whisper**: OpenAI
-- **Llama3**: Meta AI
-- **Kokoro TTS**: [Model provider]
-- **Ollama**: Ollama team
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
 ---
 
-**Enjoy your local AI voice assistant! 🎉**
+**Made with ❤️ for English learning and AI exploration**
