@@ -8,7 +8,7 @@ import numpy as np
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, 
     QHBoxLayout, QLabel, QScrollArea, QPushButton, 
-    QComboBox, QFrame, QSpacerItem, QSizePolicy
+    QComboBox, QFrame, QSpacerItem, QSizePolicy, QLineEdit
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, pyqtSlot, QTimer
 from PyQt6.QtGui import QFont
@@ -85,48 +85,131 @@ class WorkerThread(QThread):
     user_message = pyqtSignal(str)
     bot_message = pyqtSignal(str)
     processing_complete = pyqtSignal()
+    speaking_started = pyqtSignal()  # Signal when TTS starts playing
     
     def __init__(self, ai_manager, audio_player):
         super().__init__()
         self.ai_manager = ai_manager
         self.audio_player = audio_player
         self.audio_data = None
+        self.text_input = None  # For text messages
+        self.interrupted = False
     
     def set_audio(self, audio_data):
         """Set audio data to process"""
         self.audio_data = audio_data
+        self.text_input = None
+    
+    def set_text(self, text):
+        """Set text to process (skip transcription)"""
+        self.text_input = text
+        self.audio_data = None
+    
+    def interrupt(self):
+        """Interrupt the current processing (stop audio)"""
+        self.interrupted = True
+        self.audio_player.stop()
+        print("⚠️ Interrupted by user")
     
     def run(self):
-        """Process the audio through the pipeline"""
-        if self.audio_data is None:
+        """Process the audio or text through the pipeline"""
+        self.interrupted = False
+        
+        # Determine user text source
+        if self.text_input:
+            user_text = self.text_input
+            self.user_message.emit(user_text)
+        elif self.audio_data is not None:
+            # Step 1: Transcribe
+            self.status_changed.emit("Transcribing...")
+            user_text = self.ai_manager.transcribe(self.audio_data)
+            
+            if not user_text:
+                self.status_changed.emit("Ready")
+                self.processing_complete.emit()
+                return
+            
+            self.user_message.emit(user_text)
+        else:
             self.processing_complete.emit()
             return
         
-        # Step 1: Transcribe
-        self.status_changed.emit("Transcribing...")
-        user_text = self.ai_manager.transcribe(self.audio_data)
-        
-        if not user_text:
-            self.status_changed.emit("Ready")
+        if self.interrupted:
             self.processing_complete.emit()
             return
-        
-        self.user_message.emit(user_text)
         
         # Step 2: Get LLM response
         self.status_changed.emit("Thinking...")
         bot_text = self.ai_manager.get_llm_response(user_text)
         self.bot_message.emit(bot_text)
         
-        # Step 3: Generate and play speech
-        self.status_changed.emit("Speaking...")
-        audio_output, sample_rate = self.ai_manager.text_to_speech(bot_text)
+        if self.interrupted:
+            self.processing_complete.emit()
+            return
         
-        if audio_output is not None and len(audio_output) > 0:
-            self.audio_player.play(audio_output, sample_rate)
+        # Step 3: Generate and play speech by paragraphs for faster response
+        self.status_changed.emit("Speaking...")
+        self.speaking_started.emit()  # Notify UI that speaking started
+        
+        # Split text into paragraphs
+        paragraphs = self._split_into_paragraphs(bot_text)
+        
+        for i, paragraph in enumerate(paragraphs):
+            if self.interrupted:
+                break
+            
+            # Clean markdown from paragraph
+            clean_text = self._clean_markdown(paragraph)
+            
+            if not clean_text.strip():
+                continue
+            
+            # Generate and play audio for this paragraph
+            audio_output, sample_rate = self.ai_manager.text_to_speech(clean_text)
+            
+            if audio_output is not None and len(audio_output) > 0 and not self.interrupted:
+                self.audio_player.play(audio_output, sample_rate)
+            else:
+                break
         
         self.status_changed.emit("Ready")
         self.processing_complete.emit()
+    
+    def _split_into_paragraphs(self, text):
+        """Split text into paragraphs for faster TTS streaming"""
+        # Split by double newline or single newline
+        paragraphs = text.replace('\r\n', '\n').split('\n\n')
+        
+        # If no double newlines, try single newlines
+        if len(paragraphs) == 1:
+            paragraphs = text.split('\n')
+        
+        # Filter out empty paragraphs
+        return [p.strip() for p in paragraphs if p.strip()]
+    
+    def _clean_markdown(self, text):
+        """Remove markdown symbols like *, **, etc."""
+        import re
+        
+        # Remove bold/italic markers
+        text = re.sub(r'\*\*\*(.+?)\*\*\*', r'\1', text)  # ***text***
+        text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)  # **text**
+        text = re.sub(r'\*(.+?)\*', r'\1', text)  # *text*
+        text = re.sub(r'__(.+?)__', r'\1', text)  # __text__
+        text = re.sub(r'_(.+?)_', r'\1', text)  # _text_
+        
+        # Remove remaining asterisks
+        text = text.replace('*', '')
+        text = text.replace('_', '')
+        
+        # Remove markdown headers
+        text = re.sub(r'^#+\s+', '', text, flags=re.MULTILINE)
+        
+        # Remove code blocks
+        text = re.sub(r'```.*?```', '', text, flags=re.DOTALL)
+        text = re.sub(r'`(.+?)`', r'\1', text)
+        
+        return text.strip()
 
 
 class ChatBubble(QFrame):
@@ -174,6 +257,7 @@ class MainWindow(QMainWindow):
         # State
         self.is_recording = False
         self.is_processing = False
+        self.is_speaking = False
         
         # Initialize components
         self.recorder = AudioRecorder()
@@ -256,60 +340,158 @@ class MainWindow(QMainWindow):
         # ===== INPUT BAR =====
         input_bar = QWidget()
         input_bar.setObjectName("inputBar")
-        input_bar.setFixedHeight(120)
+        input_bar.setFixedHeight(140)
         input_layout = QVBoxLayout(input_bar)
-        input_layout.setContentsMargins(20, 15, 20, 20)
+        input_layout.setContentsMargins(16, 12, 16, 16)
         input_layout.setSpacing(10)
         
-        # Status label
-        self.status_label = QLabel("Ready")
-        self.status_label.setObjectName("statusLabel")
-        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        input_layout.addWidget(self.status_label)
+        # Text input row
+        text_row = QHBoxLayout()
+        text_row.setSpacing(10)
         
-        # Button row
+        # Text input field
+        self.text_input = QLineEdit()
+        self.text_input.setObjectName("textInput")
+        self.text_input.setPlaceholderText("Type a message...")
+        self.text_input.setStyleSheet("""
+            QLineEdit {
+                background-color: #282A2C;
+                color: #E3E3E3;
+                border: 1px solid #3C4043;
+                border-radius: 20px;
+                padding: 12px 18px;
+                font-size: 14px;
+            }
+            QLineEdit:focus {
+                border-color: #8AB4F8;
+            }
+        """)
+        self.text_input.returnPressed.connect(self.send_text_message)
+        text_row.addWidget(self.text_input)
+        
+        # Send button
+        self.send_btn = QPushButton("➤")
+        self.send_btn.setObjectName("sendButton")
+        self.send_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #1A73E8;
+                color: white;
+                border: none;
+                border-radius: 20px;
+                min-width: 40px;
+                max-width: 40px;
+                min-height: 40px;
+                max-height: 40px;
+                font-size: 18px;
+            }
+            QPushButton:hover {
+                background-color: #4285F4;
+            }
+            QPushButton:disabled {
+                background-color: #3C4043;
+            }
+        """)
+        self.send_btn.clicked.connect(self.send_text_message)
+        self.send_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        text_row.addWidget(self.send_btn)
+        
+        input_layout.addLayout(text_row)
+        
+        # Button row (mic + status)
         button_row = QHBoxLayout()
-        button_row.setSpacing(20)
+        button_row.setSpacing(15)
         
         # Clear button (left)
         self.clear_btn = QPushButton("Clear")
         self.clear_btn.setObjectName("clearButton")
         self.clear_btn.clicked.connect(self.clear_chat)
-        self.clear_btn.setFixedWidth(80)
+        self.clear_btn.setFixedWidth(70)
         button_row.addWidget(self.clear_btn)
         
-        button_row.addStretch()
+        # Status label (center-left)
+        self.status_label = QLabel("Ready")
+        self.status_label.setObjectName("statusLabel")
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        button_row.addWidget(self.status_label, 1)
         
-        # MIC BUTTON (center) - The star of the show
+        # MIC BUTTON (center-right) - Main voice button
         self.mic_btn = QPushButton("🎤")
         self.mic_btn.setObjectName("micButton")
         self.mic_btn.clicked.connect(self.toggle_recording)
         self.mic_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         button_row.addWidget(self.mic_btn)
         
-        button_row.addStretch()
-        
-        # Spacer for symmetry
-        spacer = QWidget()
-        spacer.setFixedWidth(80)
-        button_row.addWidget(spacer)
-        
         input_layout.addLayout(button_row)
         main_layout.addWidget(input_bar)
         
         # Welcome message
-        self.add_bot_message("Hello! Tap the microphone and speak. Tap again when you're done.")
+        self.add_bot_message("Hello! Type a message or tap the microphone to speak.")
     
     def toggle_recording(self):
-        """Toggle between recording and not recording"""
+        """Toggle between recording and not recording, or interrupt if speaking"""
         
-        if self.is_processing:
+        # If speaking, interrupt
+        if self.is_speaking:
+            self.interrupt_speaking()
+            return
+        
+        if self.is_processing and not self.is_speaking:
             return
         
         if self.is_recording:
             self.stop_recording()
         else:
             self.start_recording()
+    
+    def interrupt_speaking(self):
+        """Interrupt the bot while speaking"""
+        if self.worker_thread and self.worker_thread.isRunning():
+            self.worker_thread.interrupt()
+            self.worker_thread.wait()  # Wait for thread to finish
+            self.status_label.setText("Ready")
+            self.is_speaking = False
+            self.is_processing = False
+            self.mic_btn.setText("🎤")
+            self.mic_btn.setEnabled(True)
+            self.send_btn.setEnabled(True)
+            print("🛑 User interrupted playback")
+    
+    def send_text_message(self):
+        """Send a text message typed by user"""
+        text = self.text_input.text().strip()
+        
+        if not text:
+            return
+        
+        if self.ai_manager is None:
+            self.status_label.setText("AI not loaded!")
+            return
+        
+        # If speaking, interrupt first
+        if self.is_speaking:
+            self.interrupt_speaking()
+        
+        if self.is_processing:
+            return
+        
+        # Clear input
+        self.text_input.clear()
+        
+        # Start processing
+        self.is_processing = True
+        self.mic_btn.setEnabled(False)
+        self.send_btn.setEnabled(False)
+        self.status_label.setText("Processing...")
+        
+        # Start worker thread with text
+        self.worker_thread = WorkerThread(self.ai_manager, self.player)
+        self.worker_thread.set_text(text)
+        self.worker_thread.status_changed.connect(self.update_status)
+        self.worker_thread.user_message.connect(self.add_user_message)
+        self.worker_thread.bot_message.connect(self.add_bot_message)
+        self.worker_thread.processing_complete.connect(self.on_processing_complete)
+        self.worker_thread.speaking_started.connect(self.on_speaking_started)
+        self.worker_thread.start()
     
     def start_recording(self):
         """Start manual recording"""
@@ -404,14 +586,25 @@ class MainWindow(QMainWindow):
         self.worker_thread.user_message.connect(self.add_user_message)
         self.worker_thread.bot_message.connect(self.add_bot_message)
         self.worker_thread.processing_complete.connect(self.on_processing_complete)
+        self.worker_thread.speaking_started.connect(self.on_speaking_started)
         self.worker_thread.start()
     
     @pyqtSlot()
     def on_processing_complete(self):
         """Called when processing is done"""
         self.is_processing = False
+        self.is_speaking = False
         self.mic_btn.setEnabled(True)
+        self.send_btn.setEnabled(True)
+        self.mic_btn.setText("🎤")
         self.status_label.setText("Ready")
+    
+    @pyqtSlot()
+    def on_speaking_started(self):
+        """Called when TTS starts playing audio"""
+        self.is_speaking = True
+        self.mic_btn.setEnabled(True)  # Enable to allow interruption
+        self.mic_btn.setText("⏹️")  # Change to stop icon
     
     @pyqtSlot(str)
     def update_status(self, status):
