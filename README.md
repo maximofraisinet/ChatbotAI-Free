@@ -1,11 +1,11 @@
-# Voice Chatbot - AI English Practice Assistant 🎙️🤖
+# Voice Chatbot - AI Language Practice Assistant 🎙️🤖
 
-A fully local voice chatbot with two conversation modes: **Classic Chat** and **Live Mode**. Built to help practice English conversation skills through natural AI interactions.
+A fully local voice chatbot with two conversation modes: **Classic Chat** and **Live Mode**. Built to help practice **English** and **Spanish** conversation skills through natural AI interactions.
 
 ## About This Project 💡
 
 I created this chatbot as a personal tool to:
-- **Practice my English** through realistic conversations
+- **Practice my English and Spanish** through realistic conversations
 - **Learn more** about AI integration, speech processing, and UI development
 - Experiment with real-time streaming and voice activity detection
 ---
@@ -23,13 +23,18 @@ https://github.com/user-attachments/assets/c33bd6a7-a4ae-48cf-89c5-c72d019a0d53
 
 ## Features ✨
 
+### 🌐 Multi-Language Support
+- **English**: Kokoro ONNX TTS for natural speech
+- **Español**: Sherpa-ONNX TTS with high-quality voices (Marta from voicepowered.ai)
+- Easy language switching in settings
+
 ### 🎯 Dual Mode Interface
 - **Classic Chat Mode**: Traditional message-by-message conversation with text input and voice recording
 - **Live Mode**: Continuous hands-free conversation with real-time barge-in (interrupt the AI anytime by speaking)
 
 ### 🗣️ Voice Capabilities
-- Real-time speech-to-text (Whisper)
-- Natural text-to-speech output (Kokoro ONNX)
+- Real-time speech-to-text (Whisper) - supports English and Spanish
+- Natural text-to-speech output (Kokoro for English, Sherpa for Spanish)
 - Voice Activity Detection (VAD) for automatic silence detection
 
 ### 🧠 AI Features
@@ -45,7 +50,7 @@ https://github.com/user-attachments/assets/c33bd6a7-a4ae-48cf-89c5-c72d019a0d53
 
 ### ⚡ Smart Features
 - Barge-in detection - Interrupt the AI naturally by speaking
-- User preferences saved locally (model, font size, auto-send mode)
+- User preferences saved locally (model, font size, auto-send mode, language)
 - Multi-threaded for smooth performance
 
 ## Installation 📦
@@ -110,17 +115,35 @@ ChatbotAI-English/
 ├── main.py
 ├── ai_manager.py
 ├── ...
-├── kokoro-v0_19.onnx    ← Download this
-└── voices.json           ← Download this
+├── kokoro-v0_19.onnx    ← Download this (English TTS)
+└── voices.json           ← Download this (English TTS)
 ```
 
-6. **Install an Ollama model:**
+6. **(Optional) Spanish TTS Support with Sherpa-ONNX:**
+
+If you want Spanish language support:
+
+```bash
+# Install sherpa-onnx
+pip install sherpa-onnx
+
+# Download Spanish voice model (MMS Spanish)
+mkdir -p models/sherpa-spanish
+cd models/sherpa-spanish
+wget https://huggingface.co/csukuangfj/vits-mms-spa/resolve/main/model.onnx
+wget https://huggingface.co/csukuangfj/vits-mms-spa/resolve/main/tokens.txt
+cd ../..
+```
+
+Alternative: For higher quality Spanish voices, download the **Marta** voice from [VoicePowered.ai](https://voicepowered.ai/app/voice) and place the files in `models/sherpa-spanish/`.
+
+7. **Install an Ollama model:**
 ```bash
 ollama pull llama3.1:8b
 # or try other models: mistral, gemma2, etc.
 ```
 
-7. **Run the application:**
+8. **Run the application:**
 ```bash
 python main.py
 ```
@@ -191,6 +214,7 @@ python main.py
 5. Click ✕ to return to Chat Mode
 
 ### Settings ⚙️
+- **Language**: English or Español (changes STT and TTS engines)
 - **Font Size**: Small, Medium, or Large
 - **Voice Mode**: Auto-send after recording or Manual review
 - **Model Selection**: Switch between available Ollama models
@@ -198,9 +222,10 @@ python main.py
 ## Technologies Used 🛠️
 
 - **Python & PyQt6** - Application framework and UI
-- **Whisper** (via faster-whisper) - Speech-to-text
+- **Whisper** (via faster-whisper) - Speech-to-text (English & Spanish)
 - **Ollama** (streaming mode) - Local LLM inference
-- **Kokoro ONNX** - Text-to-speech synthesis
+- **Kokoro ONNX** - Text-to-speech synthesis (English)
+- **Sherpa-ONNX** - Text-to-speech synthesis (Spanish, via voicepowered.ai voices)
 - **PyAudio/sounddevice** - Audio I/O
 - **NumPy** - Audio processing
 
@@ -209,12 +234,19 @@ python main.py
 ```
 ChatbotAI-English/
 ├── main.py              # Main application & UI
-├── ai_manager.py        # AI model coordination (Whisper, Ollama, Kokoro)
+├── ai_manager.py        # AI model coordination (Whisper, Ollama, TTS)
+├── tts_manager.py       # Hybrid TTS manager (Kokoro + Sherpa)
+├── kokoro_wrapper.py    # Kokoro ONNX wrapper (English TTS)
+├── sherpa_wrapper.py    # Sherpa-ONNX wrapper (Spanish TTS)
 ├── audio_utils.py       # Audio recording and playback
 ├── styles.py            # UI styling (Gemini-inspired dark theme)
 ├── preferences.py       # User settings persistence
-├── kokoro-v0_19.onnx   # TTS model
-├── voices.json          # Voice configurations
+├── kokoro-v0_19.onnx    # Kokoro TTS model (English)
+├── voices.json          # Kokoro voice configurations
+├── models/
+│   └── sherpa-spanish/  # Spanish TTS model (Sherpa-ONNX)
+│       ├── model.onnx
+│       └── tokens.txt
 └── requirements.txt     # Python dependencies
 ```
 

@@ -19,7 +19,7 @@ from PyQt6.QtGui import QFont, QColor
 from styles import GEMINI_STYLE, COLORS
 from audio_utils import AudioRecorder, AudioPlayer
 from ai_manager import AIManager
-from preferences import load_preferences, save_preferences, get_font_size_config, FONT_SIZES
+from preferences import load_preferences, save_preferences, get_font_size_config, FONT_SIZES, get_language_config, get_available_languages, LANGUAGES
 import ollama
 
 
@@ -811,14 +811,15 @@ class LiveModeWidget(QWidget):
 
 
 class SettingsDialog(QDialog):
-    """Settings dialog with font size options"""
+    """Settings dialog with font size and language options"""
     
-    def __init__(self, parent=None, auto_send=True, font_size="medium"):
+    def __init__(self, parent=None, auto_send=True, font_size="medium", language="english"):
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.setMinimumWidth(350)
         self.auto_send = auto_send
         self.font_size = font_size
+        self.language = language
         
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
@@ -834,6 +835,60 @@ class SettingsDialog(QDialog):
         separator.setFrameShape(QFrame.Shape.HLine)
         separator.setStyleSheet("background-color: #3C4043;")
         layout.addWidget(separator)
+        
+        # ===== LANGUAGE SETTING =====
+        lang_label = QLabel("🌐 Language / Idioma:")
+        lang_label.setStyleSheet("font-size: 14px; color: #E3E3E3; margin-top: 10px;")
+        layout.addWidget(lang_label)
+        
+        self.language_combo = QComboBox()
+        self.language_combo.addItems(["English", "Español"])
+        lang_map = {"english": 0, "spanish": 1}
+        self.language_combo.setCurrentIndex(lang_map.get(language, 0))
+        self.language_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #282A2C;
+                color: #E3E3E3;
+                border: 1px solid #3C4043;
+                border-radius: 8px;
+                padding: 8px 16px;
+                font-size: 13px;
+                min-width: 120px;
+            }
+            QComboBox:hover {
+                background-color: #3C4043;
+            }
+            QComboBox::drop-down {
+                border: none;
+                padding-right: 10px;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 6px solid #9AA0A6;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #282A2C;
+                color: #E3E3E3;
+                selection-background-color: #3C4043;
+                border: 1px solid #3C4043;
+                border-radius: 8px;
+                padding: 4px;
+            }
+        """)
+        layout.addWidget(self.language_combo)
+        
+        lang_help = QLabel("English uses Kokoro TTS • Español uses Sherpa-ONNX (Marta voice)")
+        lang_help.setWordWrap(True)
+        lang_help.setStyleSheet("font-size: 11px; color: #9AA0A6; margin-left: 4px;")
+        layout.addWidget(lang_help)
+        
+        # Separator 2
+        separator2 = QFrame()
+        separator2.setFrameShape(QFrame.Shape.HLine)
+        separator2.setStyleSheet("background-color: #3C4043;")
+        layout.addWidget(separator2)
         
         # Font size setting
         font_label = QLabel("Font Size:")
@@ -950,6 +1005,10 @@ class SettingsDialog(QDialog):
     def get_font_size(self):
         size_names = ["small", "medium", "large"]
         return size_names[self.font_size_combo.currentIndex()]
+    
+    def get_language(self):
+        lang_names = ["english", "spanish"]
+        return lang_names[self.language_combo.currentIndex()]
 
 
 class MainWindow(QMainWindow):
@@ -971,6 +1030,7 @@ class MainWindow(QMainWindow):
         self.is_speaking = False
         self.auto_send = self.preferences.get("auto_send", True)
         self.font_size_name = self.preferences.get("font_size", "medium")
+        self.language = self.preferences.get("language", "english")
         self.chat_bubbles = []  # Track bubbles for font size updates
         
         # Initialize components
@@ -979,10 +1039,10 @@ class MainWindow(QMainWindow):
         self.recorder_thread = None
         self.worker_thread = None
         
-        # Load AI Manager
+        # Load AI Manager with language setting
         print("Loading AI models...")
         try:
-            self.ai_manager = AIManager()
+            self.ai_manager = AIManager(language=self.language)
         except Exception as e:
             print(f"Error initializing AI: {e}")
             self.ai_manager = None
@@ -1454,23 +1514,33 @@ class MainWindow(QMainWindow):
     
     def open_settings(self):
         """Open settings dialog"""
-        dialog = SettingsDialog(self, self.auto_send, self.font_size_name)
+        dialog = SettingsDialog(self, self.auto_send, self.font_size_name, self.language)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.auto_send = dialog.get_auto_send()
             new_font_size = dialog.get_font_size()
+            new_language = dialog.get_language()
             
             # Update font size if changed
             if new_font_size != self.font_size_name:
                 self.font_size_name = new_font_size
                 self.apply_font_size()
             
+            # Update language if changed
+            if new_language != self.language:
+                self.language = new_language
+                if self.ai_manager:
+                    self.ai_manager.set_language(new_language)
+                print(f"🌐 Language changed to: {new_language}")
+            
             # Save preferences
             self.preferences["auto_send"] = self.auto_send
             self.preferences["font_size"] = self.font_size_name
+            self.preferences["language"] = self.language
             save_preferences(self.preferences)
             
             mode_name = "Auto-send" if self.auto_send else "Manual review"
-            print(f"⚙️ Settings updated - Mode: {mode_name}, Font: {self.font_size_name}")
+            lang_display = "English" if self.language == "english" else "Español"
+            print(f"⚙️ Settings updated - Mode: {mode_name}, Font: {self.font_size_name}, Lang: {lang_display}")
     
     def apply_font_size(self):
         """Apply font size to all UI elements"""

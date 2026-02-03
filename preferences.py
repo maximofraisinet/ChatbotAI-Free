@@ -9,10 +9,27 @@ from pathlib import Path
 
 PREFERENCES_FILE = Path(__file__).parent / "user_preferences.json"
 
+# Available languages
+LANGUAGES = {
+    "english": {
+        "code": "en",
+        "whisper_code": "en",
+        "name": "English",
+        "tts_engine": "kokoro",
+    },
+    "spanish": {
+        "code": "es", 
+        "whisper_code": "es",
+        "name": "Español",
+        "tts_engine": "sherpa",
+    },
+}
+
 DEFAULT_PREFERENCES = {
     "model": None,  # Will use first available model if None
     "auto_send": True,
     "font_size": "medium",  # small, medium, large
+    "language": "english",  # english, spanish
 }
 
 FONT_SIZES = {
@@ -64,3 +81,14 @@ def save_preferences(preferences: dict) -> bool:
 def get_font_size_config(size_name: str) -> dict:
     """Get font size configuration by name"""
     return FONT_SIZES.get(size_name, FONT_SIZES["medium"])
+
+
+def get_language_config(language_name: str) -> dict:
+    """Get language configuration by name"""
+    return LANGUAGES.get(language_name, LANGUAGES["english"])
+
+
+def get_available_languages() -> list:
+    """Get list of available language names"""
+    return list(LANGUAGES.keys())
+

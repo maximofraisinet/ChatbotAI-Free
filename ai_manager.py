@@ -1,6 +1,7 @@
 """
-AI Manager - Handles Whisper STT, Ollama LLM, and Kokoro TTS
+AI Manager - Handles Whisper STT, Ollama LLM, and TTS (Kokoro/Sherpa)
 Loads models once at initialization to save VRAM
+Supports English and Spanish languages
 """
 
 import os
@@ -8,12 +9,14 @@ import json
 import numpy as np
 from faster_whisper import WhisperModel
 import ollama
+
+# Import TTS Manager (handles both Kokoro and Sherpa)
 try:
-    from kokoro_wrapper import KokoroWrapper as Kokoro
-    KOKORO_AVAILABLE = True
+    from tts_manager import TTSManager
+    TTS_MANAGER_AVAILABLE = True
 except ImportError:
-    KOKORO_AVAILABLE = False
-    print("Warning: kokoro-onnx not installed, will use fallback TTS")
+    TTS_MANAGER_AVAILABLE = False
+    print("Warning: tts_manager not found, TTS will be disabled")
 
 
 class AIManager:
@@ -24,7 +27,9 @@ class AIManager:
                  ollama_model="llama3.1:8b",
                  kokoro_model_path="kokoro-v0_19.onnx",
                  voices_path="voices.json",
-                 voice_name="af_bella"):
+                 voice_name="af_bella",
+                 language="english",
+                 sherpa_model_dir="models/sherpa-spanish"):
         """
         Initialize all AI models
         
@@ -34,8 +39,12 @@ class AIManager:
             kokoro_model_path: Path to Kokoro ONNX model
             voices_path: Path to voices.json
             voice_name: Voice to use (af_bella or af_sarah)
+            language: Current language ("english" or "spanish")
+            sherpa_model_dir: Directory with Sherpa Spanish model
         """
         print("Initializing AI Manager...")
+        
+        self.language = language
         
         # Check CUDA availability
         try:
@@ -49,52 +58,58 @@ class AIManager:
             device = "cuda"
             compute_type = "float16"
         
+        # Determine Whisper model based on language
+        # Use multilingual model for Spanish, English-specific for English
+        if language == "spanish":
+            actual_whisper_model = whisper_model.replace(".en", "")  # base.en -> base
+            print(f"Using multilingual Whisper for Spanish: {actual_whisper_model}")
+        else:
+            actual_whisper_model = whisper_model
+        
         # Load Whisper STT
-        print(f"Loading Whisper model: {whisper_model} on {device}")
+        print(f"Loading Whisper model: {actual_whisper_model} on {device}")
         print("This may take a few minutes on first run (downloading model)...")
         self.whisper = WhisperModel(
-            whisper_model,
+            actual_whisper_model,
             device=device,
             compute_type=compute_type
         )
+        self._whisper_model_name = actual_whisper_model
         print("✓ Whisper model loaded successfully!")
         
         # Ollama LLM
         print(f"✓ Ollama configured with model: {ollama_model}")
         self.ollama_model = ollama_model
         
-        # Load Kokoro TTS
-        print(f"Loading Kokoro TTS model: {kokoro_model_path}")
-        print("Setting up ONNX runtime...")
+        # Load TTS Manager (handles both Kokoro and Sherpa)
+        print("Loading TTS engines...")
         
-        if KOKORO_AVAILABLE:
+        if TTS_MANAGER_AVAILABLE:
             try:
-                # Kokoro needs the model file and voices file
-                print(f"Initializing Kokoro with voice: {voice_name}")
-                self.kokoro = Kokoro(kokoro_model_path, voices_path)
-                self.voice_name = voice_name
-                
-                # Test if the voice works
-                print("Testing TTS with a sample phrase...")
-                test_audio, test_sr = self.kokoro.create("Hello", voice=voice_name)
-                print(f"✓ Kokoro TTS model loaded successfully!")
-                print(f"✓ Voice loaded: {voice_name}")
-                print(f"✓ Test generated {len(test_audio)} samples at {test_sr}Hz")
-                self.tts_available = True
+                self.tts_manager = TTSManager(
+                    language=language,
+                    kokoro_model_path=kokoro_model_path,
+                    voices_path=voices_path,
+                    kokoro_voice=voice_name,
+                    sherpa_model_dir=sherpa_model_dir,
+                )
+                self.tts_available = self.tts_manager.is_available()
             except Exception as e:
-                print(f"Warning: Could not load Kokoro: {e}")
-                print("TTS will use fallback method")
+                print(f"Warning: Could not initialize TTS Manager: {e}")
                 import traceback
                 traceback.print_exc()
+                self.tts_manager = None
                 self.tts_available = False
         else:
-            print("Kokoro not available, TTS disabled")
+            print("TTS Manager not available, TTS disabled")
+            self.tts_manager = None
             self.tts_available = False
         
         # Conversation history for context
         self.conversation_history = []
         
         print("\n🎉 AI Manager initialized successfully!")
+        print(f"   Language: {language}")
         print("Ready to chat!\n")
     
     def transcribe(self, audio_data, sample_rate=16000):
@@ -115,7 +130,9 @@ class AIManager:
             'you', 'thank you', 'thanks', 'subtitle', 'subtitles',
             'mbc', 'bbc', 'thank you for watching', 'thanks for watching',
             'please subscribe', 'like and subscribe', 'bye', 'goodbye',
-            'see you next time', 'see you', '.', '...'
+            'see you next time', 'see you', '.', '...',
+            # Spanish hallucinations
+            'gracias', 'subtítulos', 'suscríbete', 'adiós'
         ]
         
         try:
@@ -123,9 +140,12 @@ class AIManager:
             if audio_data.dtype != np.float32:
                 audio_data = audio_data.astype(np.float32)
             
+            # Determine language code for Whisper
+            whisper_lang = "es" if self.language == "spanish" else "en"
+            
             segments, info = self.whisper.transcribe(
                 audio_data,
-                language="en",
+                language=whisper_lang,
                 beam_size=5,
                 vad_filter=True,
                 condition_on_previous_text=False  # Prevent hallucinations from context
@@ -147,12 +167,27 @@ class AIManager:
                 print(f"Text too short, discarding: '{text}'")
                 return ""
             
-            print(f"Transcription: {text}")
+            print(f"Transcription [{whisper_lang}]: {text}")
             return text
             
         except Exception as e:
             print(f"Transcription error: {e}")
             return ""
+    
+    def set_language(self, language: str):
+        """
+        Change the current language for STT and TTS
+        
+        Args:
+            language: "english" or "spanish"
+        """
+        self.language = language
+        print(f"🌐 AI Manager language set to: {language}")
+        
+        # Update TTS Manager language
+        if self.tts_manager:
+            self.tts_manager.set_language(language)
+            self.tts_available = self.tts_manager.is_available()
     
     def get_llm_response(self, user_text):
         """
@@ -281,7 +316,8 @@ class AIManager:
     
     def text_to_speech(self, text):
         """
-        Convert text to speech using Kokoro ONNX
+        Convert text to speech using the appropriate TTS engine
+        (Kokoro for English, Sherpa for Spanish)
         
         Args:
             text: Text to synthesize
@@ -291,16 +327,15 @@ class AIManager:
         """
         print(f"Generating speech for: '{text[:50]}...'")
         
-        if not self.tts_available:
+        if not self.tts_available or not self.tts_manager:
             print("TTS not available, returning silence")
             return np.zeros(24000, dtype=np.float32), 24000
         
         try:
-            # Generate audio using Kokoro
-            print("Calling Kokoro.create()...")
-            samples, sample_rate = self.kokoro.create(text, voice=self.voice_name, speed=1.0)
+            # Use TTS Manager to route to appropriate engine
+            samples, sample_rate = self.tts_manager.create(text, speed=1.0)
             
-            print(f"Kokoro returned: sample_rate={sample_rate}, samples type={type(samples)}")
+            print(f"TTS returned: sample_rate={sample_rate}, samples={len(samples)}")
             
             # Convert to numpy array if needed
             if not isinstance(samples, np.ndarray):
