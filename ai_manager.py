@@ -23,7 +23,7 @@ class AIManager:
     """Manages all AI models for the chatbot"""
     
     def __init__(self, 
-                 whisper_model="base.en",
+                 whisper_model="base",  # Use multilingual by default (not base.en)
                  ollama_model="llama3.1:8b",
                  kokoro_model_path="kokoro-v0_19.onnx",
                  voices_path="voices.json",
@@ -34,7 +34,7 @@ class AIManager:
         Initialize all AI models
         
         Args:
-            whisper_model: faster-whisper model size
+            whisper_model: faster-whisper model size (use 'base' for multilingual)
             ollama_model: Ollama model name
             kokoro_model_path: Path to Kokoro ONNX model
             voices_path: Path to voices.json
@@ -51,28 +51,25 @@ class AIManager:
             import torch
             cuda_available = torch.cuda.is_available()
             print(f"CUDA available: {cuda_available}")
-            device = "cuda" if cuda_available else "cpu"
-            compute_type = "float16" if cuda_available else "int8"
+            self._device = "cuda" if cuda_available else "cpu"
+            self._compute_type = "float16" if cuda_available else "int8"
         except ImportError:
             print("PyTorch not found, assuming CUDA available")
-            device = "cuda"
-            compute_type = "float16"
+            self._device = "cuda"
+            self._compute_type = "float16"
         
-        # Determine Whisper model based on language
-        # Use multilingual model for Spanish, English-specific for English
-        if language == "spanish":
-            actual_whisper_model = whisper_model.replace(".en", "")  # base.en -> base
-            print(f"Using multilingual Whisper for Spanish: {actual_whisper_model}")
-        else:
-            actual_whisper_model = whisper_model
+        # IMPORTANT: Always use multilingual model for multi-language support
+        # Remove .en suffix if present - the .en models ONLY understand English
+        actual_whisper_model = whisper_model.replace(".en", "")
+        print(f"Using multilingual Whisper model: {actual_whisper_model}")
         
         # Load Whisper STT
-        print(f"Loading Whisper model: {actual_whisper_model} on {device}")
+        print(f"Loading Whisper model: {actual_whisper_model} on {self._device}")
         print("This may take a few minutes on first run (downloading model)...")
         self.whisper = WhisperModel(
             actual_whisper_model,
-            device=device,
-            compute_type=compute_type
+            device=self._device,
+            compute_type=self._compute_type
         )
         self._whisper_model_name = actual_whisper_model
         print("✓ Whisper model loaded successfully!")
@@ -125,14 +122,17 @@ class AIManager:
         """
         print("Transcribing audio...")
         
-        # List of common Whisper hallucinations to filter out
-        HALLUCINATION_PHRASES = [
+        # List of common Whisper hallucinations to filter out (language-specific)
+        HALLUCINATION_PHRASES_EN = [
             'you', 'thank you', 'thanks', 'subtitle', 'subtitles',
             'mbc', 'bbc', 'thank you for watching', 'thanks for watching',
             'please subscribe', 'like and subscribe', 'bye', 'goodbye',
-            'see you next time', 'see you', '.', '...',
-            # Spanish hallucinations
-            'gracias', 'subtítulos', 'suscríbete', 'adiós'
+            'see you next time', 'see you', '.', '...'
+        ]
+        
+        HALLUCINATION_PHRASES_ES = [
+            'gracias', 'subtítulos', 'suscríbete', 'adiós', 'hasta luego',
+            'gracias por ver', 'nos vemos', '.', '...'
         ]
         
         try:
@@ -142,13 +142,26 @@ class AIManager:
             
             # Determine language code for Whisper
             whisper_lang = "es" if self.language == "spanish" else "en"
+            hallucinations = HALLUCINATION_PHRASES_ES if self.language == "spanish" else HALLUCINATION_PHRASES_EN
             
+            print(f"Whisper transcribing with language='{whisper_lang}'...")
+            
+            # Use task="transcribe" explicitly and set language
             segments, info = self.whisper.transcribe(
                 audio_data,
                 language=whisper_lang,
+                task="transcribe",  # Explicit transcription (not translation)
                 beam_size=5,
+                best_of=5,  # Better quality
                 vad_filter=True,
-                condition_on_previous_text=False  # Prevent hallucinations from context
+                vad_parameters=dict(
+                    min_silence_duration_ms=500,  # Shorter silence detection
+                    speech_pad_ms=400,
+                ),
+                condition_on_previous_text=False,  # Prevent hallucinations
+                no_speech_threshold=0.6,  # Filter out non-speech
+                log_prob_threshold=-1.0,  # More lenient
+                compression_ratio_threshold=2.4,
             )
             
             # Combine all segments
@@ -158,7 +171,7 @@ class AIManager:
             # Sanitization: Remove common hallucinations
             text_clean = text.lower().strip().strip('.,!?;:')
             
-            if text_clean in HALLUCINATION_PHRASES:
+            if text_clean in hallucinations:
                 print(f"Filtered hallucination: '{text}'")
                 return ""
             
@@ -167,11 +180,13 @@ class AIManager:
                 print(f"Text too short, discarding: '{text}'")
                 return ""
             
-            print(f"Transcription [{whisper_lang}]: {text}")
+            print(f"✓ Transcription [{whisper_lang}]: {text}")
             return text
             
         except Exception as e:
             print(f"Transcription error: {e}")
+            import traceback
+            traceback.print_exc()
             return ""
     
     def set_language(self, language: str):
