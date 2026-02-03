@@ -59,6 +59,13 @@ user_preferences.json
 *.onnx
 voices.json
 
+# BUT keep these small files
+!models/sherpa-spanish/tokens.txt
+!models/sherpa-spanish/README.md
+
+# espeak-ng data (large, must be downloaded)
+espeak-ng-data/
+
 # Faster-whisper cache
 ~/.cache/huggingface/
 .cache/

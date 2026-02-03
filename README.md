@@ -1,11 +1,11 @@
 # Voice Chatbot - AI Language Practice Assistant 🎙️🤖
 
-A fully local voice chatbot with two conversation modes: **Classic Chat** and **Live Mode**. Built to help practice **English** and **Spanish** conversation skills through natural AI interactions.
+A fully local voice chatbot with two conversation modes: **Classic Chat** and **Live Mode**. Built to help practice **English** and **Spanish** conversation skills through natural AI interactions with high-quality voices.
 
 ## About This Project 💡
 
 I created this chatbot as a personal tool to:
-- **Practice my English and Spanish** through realistic conversations
+- **Practice my English and Spanish** through realistic conversations with native-sounding voices
 - **Learn more** about AI integration, speech processing, and UI development
 - Experiment with real-time streaming and voice activity detection
 ---
@@ -25,8 +25,9 @@ https://github.com/user-attachments/assets/c33bd6a7-a4ae-48cf-89c5-c72d019a0d53
 
 ### 🌐 Multi-Language Support
 - **English**: Kokoro ONNX TTS for natural speech
-- **Español**: Sherpa-ONNX TTS with high-quality voices (Marta from voicepowered.ai)
-- Easy language switching in settings
+- **Español**: Sherpa-ONNX TTS with Daniela voice (high-quality Argentine Spanish)
+- Easy language switching in settings - change anytime without restarting
+- Automatic language detection for speech recognition
 
 ### 🎯 Dual Mode Interface
 - **Classic Chat Mode**: Traditional message-by-message conversation with text input and voice recording
@@ -60,6 +61,19 @@ https://github.com/user-attachments/assets/c33bd6a7-a4ae-48cf-89c5-c72d019a0d53
 **All Systems:**
 - **Python 3.10 or 3.11**
 - **Ollama** - Download from [ollama.ai](https://ollama.ai)
+
+### 📦 What's Included vs. What to Download
+
+**Included in the repository:**
+- ✅ All Python code
+- ✅ `tokens.txt` for Spanish voice (small file)
+- ✅ Configuration files
+
+**Must be downloaded separately (too large for GitHub):**
+- ❌ `kokoro-v0_19.onnx` (~310 MB) - English TTS
+- ❌ `voices.json` - English voice configs
+- ❌ `es_AR-daniela-high.onnx` (~108 MB) - Spanish TTS
+- ❌ `espeak-ng-data/` - Phoneme data for Spanish
 
 ### Linux Installation 🐧
 
@@ -121,21 +135,39 @@ ChatbotAI-English/
 
 6. **(Optional) Spanish TTS Support with Sherpa-ONNX:**
 
-If you want Spanish language support:
+If you want Spanish language support with **Daniela voice** (high-quality Argentine Spanish):
 
 ```bash
 # Install sherpa-onnx
 pip install sherpa-onnx
 
-# Download Spanish voice model (MMS Spanish)
+# Create directory for Spanish model
 mkdir -p models/sherpa-spanish
 cd models/sherpa-spanish
-wget https://huggingface.co/csukuangfj/vits-mms-spa/resolve/main/model.onnx
-wget https://huggingface.co/csukuangfj/vits-mms-spa/resolve/main/tokens.txt
+
+# Download Daniela voice model (108 MB - not included in repo)
+wget https://huggingface.co/csukuangfj/vits-piper-es_AR-daniela-high/resolve/main/es_AR-daniela-high.onnx
+
+# Download tokens file (already included in repo, but you can get it from:)
+# wget https://huggingface.co/csukuangfj/vits-piper-es_AR-daniela-high/resolve/main/tokens.txt
+
+# Download espeak-ng data (required for phoneme processing)
+wget https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/espeak-ng-data.tar.bz2
+tar -xjf espeak-ng-data.tar.bz2
+rm espeak-ng-data.tar.bz2
+
 cd ../..
 ```
 
-Alternative: For higher quality Spanish voices, download the **Marta** voice from [VoicePowered.ai](https://voicepowered.ai/app/voice) and place the files in `models/sherpa-spanish/`.
+**Note**: The `tokens.txt` file is already included in the repository. You only need to download the `.onnx` model file and espeak-ng data.
+
+Your `models/sherpa-spanish/` folder should contain:
+```
+models/sherpa-spanish/
+├── es_AR-daniela-high.onnx   (download this - 108 MB)
+├── tokens.txt                 (already in repo)
+└── espeak-ng-data/           (download and extract)
+```
 
 7. **Install an Ollama model:**
 ```bash
@@ -189,12 +221,33 @@ pip install -r requirements.txt
   - Download from: [Kokoro-82M releases](https://github.com/thewh1teagle/kokoro-onnx/releases)
   - Place in the project folder
 
-8. **Install an Ollama model:**
+8. **(Optional) Spanish TTS with Daniela voice:**
+
+```cmd
+pip install sherpa-onnx
+
+mkdir models\sherpa-spanish
+cd models\sherpa-spanish
+
+REM Download Daniela voice model (not included in repo - 108 MB)
+curl -L -o es_AR-daniela-high.onnx https://huggingface.co/csukuangfj/vits-piper-es_AR-daniela-high/resolve/main/es_AR-daniela-high.onnx
+
+REM Download espeak-ng data
+curl -L -o espeak-ng-data.tar.bz2 https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/espeak-ng-data.tar.bz2
+tar -xjf espeak-ng-data.tar.bz2
+del espeak-ng-data.tar.bz2
+
+cd ..\..
+```
+
+**Note**: `tokens.txt` is already included in the repository.
+
+9. **Install an Ollama model:**
 ```cmd
 ollama pull llama3.1:8b
 ```
 
-9. **Run the application:**
+10. **Run the application:**
 ```cmd
 python main.py
 ```
@@ -222,10 +275,10 @@ python main.py
 ## Technologies Used 🛠️
 
 - **Python & PyQt6** - Application framework and UI
-- **Whisper** (via faster-whisper) - Speech-to-text (English & Spanish)
-- **Ollama** (streaming mode) - Local LLM inference
-- **Kokoro ONNX** - Text-to-speech synthesis (English)
-- **Sherpa-ONNX** - Text-to-speech synthesis (Spanish, via voicepowered.ai voices)
+- **Whisper** (via faster-whisper) - Multilingual speech-to-text (English & Spanish)
+- **Ollama** (streaming mode) - Local LLM inference with streaming responses
+- **Kokoro ONNX** - Text-to-speech synthesis (English voices)
+- **Sherpa-ONNX** - Text-to-speech synthesis (Spanish - Daniela voice)
 - **PyAudio/sounddevice** - Audio I/O
 - **NumPy** - Audio processing
 
@@ -245,8 +298,9 @@ ChatbotAI-English/
 ├── voices.json          # Kokoro voice configurations
 ├── models/
 │   └── sherpa-spanish/  # Spanish TTS model (Sherpa-ONNX)
-│       ├── model.onnx
-│       └── tokens.txt
+│       ├── es_AR-daniela-high.onnx  (download separately - 108 MB)
+│       ├── tokens.txt               (included in repo)
+│       └── espeak-ng-data/          (download and extract)
 └── requirements.txt     # Python dependencies
 ```
 
