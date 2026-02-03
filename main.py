@@ -1255,8 +1255,15 @@ class MainWindow(QMainWindow):
         # Store reference to input_bar for showing/hiding
         self.input_bar = input_bar
         
-        # Welcome message
-        self.add_bot_message("Hello! Type a message or tap the microphone to speak.")
+        # Welcome message (language-dependent)
+        self.add_bot_message(self._get_welcome_message())
+    
+    def _get_welcome_message(self):
+        """Get welcome message based on current language"""
+        if self.language == "spanish":
+            return "¡Hola! Escribe un mensaje o toca el micrófono para hablar."
+        else:
+            return "Hello! Type a message or tap the microphone to speak."
     
     def toggle_recording(self):
         """Toggle between recording and not recording, or interrupt if speaking"""
@@ -1527,10 +1534,15 @@ class MainWindow(QMainWindow):
             
             # Update language if changed
             if new_language != self.language:
+                old_language = self.language
                 self.language = new_language
                 if self.ai_manager:
                     self.ai_manager.set_language(new_language)
                 print(f"🌐 Language changed to: {new_language}")
+                
+                # Show language change notification in chat
+                lang_display = "Español" if new_language == "spanish" else "English"
+                self.add_bot_message(f"🌐 {self._get_language_change_message(new_language)}")
             
             # Save preferences
             self.preferences["auto_send"] = self.auto_send
@@ -1541,6 +1553,13 @@ class MainWindow(QMainWindow):
             mode_name = "Auto-send" if self.auto_send else "Manual review"
             lang_display = "English" if self.language == "english" else "Español"
             print(f"⚙️ Settings updated - Mode: {mode_name}, Font: {self.font_size_name}, Lang: {lang_display}")
+    
+    def _get_language_change_message(self, language):
+        """Get language change notification message"""
+        if language == "spanish":
+            return "Idioma cambiado a Español. ¡Ahora puedes hablar en español!"
+        else:
+            return "Language changed to English. You can now speak in English!"
     
     def apply_font_size(self):
         """Apply font size to all UI elements"""
