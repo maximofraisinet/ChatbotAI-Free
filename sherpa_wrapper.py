@@ -112,8 +112,11 @@ class SherpaWrapper:
     
     def _find_model_file(self) -> Path:
         """Find the ONNX model file in the model directory"""
-        # Prefer int8 model (smaller, faster)
+        # Piper/Daniela voice models
         candidates = [
+            "es_AR-daniela-high.onnx",
+            "es_AR-daniela-medium.onnx",
+            "es_AR-daniela-low.onnx",
             "model.int8.onnx",
             "model.onnx",
             "vits-model.onnx",
