@@ -111,16 +111,21 @@ pip install -r requirements.txt
 
 - **Kokoro TTS Model** (`kokoro-v0_19.onnx`):
   - Download from: [Kokoro-82M releases](https://github.com/thewh1teagle/kokoro-onnx/releases)
-  - Place in the project root folder
+  - Place in `voices/english/` folder
 ```bash
+mkdir -p voices/english
+cd voices/english
 wget https://huggingface.co/thewh1teagle/Kokoro/resolve/main/kokoro-v0_19.onnx
+cd ../..
 ```
 
 - **Voice Configurations** (`voices.json`):
   - Download from: [Kokoro-82M releases](https://github.com/thewh1teagle/kokoro-onnx/releases)
-  - Place in the project root folder
+  - Place in `voices/english/` folder
 ```bash
+cd voices/english
 wget https://huggingface.co/thewh1teagle/Kokoro/resolve/main/voices.json
+cd ../..
 ```
 
 Your folder structure should look like:
@@ -129,8 +134,10 @@ ChatbotAI-English/
 ├── main.py
 ├── ai_manager.py
 ├── ...
-├── kokoro-v0_19.onnx    ← Download this (English TTS)
-└── voices.json           ← Download this (English TTS)
+└── voices/
+    └── english/
+        ├── kokoro-v0_19.onnx    ← Download this (English TTS)
+        └── voices.json           ← Download this (English TTS)
 ```
 
 6. **(Optional) Spanish TTS Support with Sherpa-ONNX:**
@@ -142,8 +149,8 @@ If you want Spanish language support with **Daniela voice** (high-quality Argent
 pip install sherpa-onnx
 
 # Create directory for Spanish model
-mkdir -p models/sherpa-spanish
-cd models/sherpa-spanish
+mkdir -p voices/spanish
+cd voices/spanish
 
 # Download Daniela voice model (108 MB - not included in repo)
 wget https://huggingface.co/csukuangfj/vits-piper-es_AR-daniela-high/resolve/main/es_AR-daniela-high.onnx
@@ -161,9 +168,9 @@ cd ../..
 
 **Note**: The `tokens.txt` file is already included in the repository. You only need to download the `.onnx` model file and espeak-ng data.
 
-Your `models/sherpa-spanish/` folder should contain:
+Your `voices/spanish/` folder should contain:
 ```
-models/sherpa-spanish/
+voices/spanish/
 ├── es_AR-daniela-high.onnx   (download this - 108 MB)
 ├── tokens.txt                 (already in repo)
 └── espeak-ng-data/           (download and extract)
@@ -215,19 +222,19 @@ pip install -r requirements.txt
 
 - **Kokoro TTS Model** (`kokoro-v0_19.onnx`):
   - Download from: [Kokoro-82M releases](https://github.com/thewh1teagle/kokoro-onnx/releases)
-  - Place in the project folder
+  - Place in `voices\english\` folder
 
 - **Voice Configurations** (`voices.json`):
   - Download from: [Kokoro-82M releases](https://github.com/thewh1teagle/kokoro-onnx/releases)
-  - Place in the project folder
+  - Place in `voices\english\` folder
 
 8. **(Optional) Spanish TTS with Daniela voice:**
 
 ```cmd
 pip install sherpa-onnx
 
-mkdir models\sherpa-spanish
-cd models\sherpa-spanish
+mkdir voices\spanish
+cd voices\spanish
 
 REM Download Daniela voice model (not included in repo - 108 MB)
 curl -L -o es_AR-daniela-high.onnx https://huggingface.co/csukuangfj/vits-piper-es_AR-daniela-high/resolve/main/es_AR-daniela-high.onnx
@@ -294,14 +301,15 @@ ChatbotAI-English/
 ├── audio_utils.py       # Audio recording and playback
 ├── styles.py            # UI styling (Gemini-inspired dark theme)
 ├── preferences.py       # User settings persistence
-├── kokoro-v0_19.onnx    # Kokoro TTS model (English)
-├── voices.json          # Kokoro voice configurations
-├── models/
-│   └── sherpa-spanish/  # Spanish TTS model (Sherpa-ONNX)
-│       ├── es_AR-daniela-high.onnx  (download separately - 108 MB)
-│       ├── tokens.txt               (included in repo)
-│       └── espeak-ng-data/          (download and extract)
-└── requirements.txt     # Python dependencies
+├── requirements.txt     # Python dependencies
+└── voices/
+    ├── english/         # English TTS models (Kokoro)
+    │   ├── kokoro-v0_19.onnx  (download separately - 310 MB)
+    │   └── voices.json        (download separately)
+    └── spanish/         # Spanish TTS model (Sherpa-ONNX)
+        ├── es_AR-daniela-high.onnx  (download separately - 108 MB)
+        ├── tokens.txt               (included in repo)
+        └── espeak-ng-data/          (download and extract)
 ```
 
 ## License 📄
