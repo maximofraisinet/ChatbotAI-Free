@@ -348,7 +348,7 @@ class AIManager:
         
         try:
             # Use TTS Manager to route to appropriate engine
-            speed = 0.75 if self.language == "spanish" else 1.0
+            speed = 0.80 if self.language == "spanish" else 1.0
             samples, sample_rate = self.tts_manager.create(text, speed=speed)
             
             print(f"TTS returned: sample_rate={sample_rate}, samples={len(samples)}")
