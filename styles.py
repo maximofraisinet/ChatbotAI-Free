@@ -174,10 +174,36 @@ QWidget#inputBar {
     border-radius: 16px;
 }
 
+/* ===== SEND BUTTON ===== */
+QPushButton#sendButton {
+    background-color: transparent;
+    color: #E3E3E3;
+    border: none;
+    border-radius: 20px;
+    min-width: 40px;
+    max-width: 40px;
+    min-height: 40px;
+    max-height: 40px;
+    font-size: 18px;
+}
+
+QPushButton#sendButton:hover {
+    background-color: #282A2C;
+}
+
+QPushButton#sendButton:pressed {
+    background-color: #3C4043;
+}
+
+QPushButton#sendButton:disabled {
+    background-color: transparent;
+    color: #5F6368;
+}
+
 /* ===== MIC BUTTON - Large Circular ===== */
 QPushButton#micButton {
-    background-color: #1A73E8;
-    color: white;
+    background-color: transparent;
+    color: #E3E3E3;
     border: none;
     border-radius: 32px;
     min-width: 64px;
@@ -188,11 +214,11 @@ QPushButton#micButton {
 }
 
 QPushButton#micButton:hover {
-    background-color: #4285F4;
+    background-color: #282A2C;
 }
 
 QPushButton#micButton:pressed {
-    background-color: #1557B0;
+    background-color: #3C4043;
 }
 
 /* ===== CLEAR BUTTON - Ghost ===== */
@@ -309,8 +335,8 @@ QPushButton#liveExitButton:hover {
 }
 
 QPushButton#liveStartButton {
-    background-color: #1A73E8;
-    color: white;
+    background-color: transparent;
+    color: #E3E3E3;
     border: none;
     border-radius: 30px;
     min-width: 60px;
@@ -321,7 +347,11 @@ QPushButton#liveStartButton {
 }
 
 QPushButton#liveStartButton:hover {
-    background-color: #4285F4;
+    background-color: #282A2C;
+}
+
+QPushButton#liveStartButton:pressed {
+    background-color: #3C4043;
 }
 """
 

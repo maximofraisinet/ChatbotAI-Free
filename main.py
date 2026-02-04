@@ -1366,6 +1366,17 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(GEMINI_STYLE)
         self.apply_font_size()  # Apply saved font size
         
+        # Force style update for buttons
+        self.send_btn.setStyleSheet("")  # Clear any inline styles
+        self.mic_btn.setStyleSheet("")
+        self.live_btn.setStyleSheet("")
+        self.style().unpolish(self.send_btn)
+        self.style().polish(self.send_btn)
+        self.style().unpolish(self.mic_btn)
+        self.style().polish(self.mic_btn)
+        self.style().unpolish(self.live_btn)
+        self.style().polish(self.live_btn)
+        
         # Recording animation timer
         self.pulse_timer = QTimer()
         self.pulse_timer.timeout.connect(self.update_recording_animation)
@@ -1515,25 +1526,6 @@ class MainWindow(QMainWindow):
         # Send button
         self.send_btn = QPushButton("➤")
         self.send_btn.setObjectName("sendButton")
-        self.send_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #1A73E8;
-                color: white;
-                border: none;
-                border-radius: 20px;
-                min-width: 40px;
-                max-width: 40px;
-                min-height: 40px;
-                max-height: 40px;
-                font-size: 18px;
-            }
-            QPushButton:hover {
-                background-color: #4285F4;
-            }
-            QPushButton:disabled {
-                background-color: #3C4043;
-            }
-        """)
         self.send_btn.clicked.connect(self.send_text_message)
         self.send_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         text_row.addWidget(self.send_btn)
@@ -1706,22 +1698,7 @@ class MainWindow(QMainWindow):
         
         # Update UI
         self.mic_btn.setText("🎤")
-        self.mic_btn.setStyleSheet("""
-            QPushButton#micButton {
-                background-color: #1A73E8;
-                color: white;
-                border: none;
-                border-radius: 32px;
-                min-width: 64px;
-                max-width: 64px;
-                min-height: 64px;
-                max-height: 64px;
-                font-size: 26px;
-            }
-            QPushButton#micButton:hover {
-                background-color: #4285F4;
-            }
-        """)
+        self.mic_btn.setStyleSheet("")  # Remove inline styles to use global CSS
         
         # Stop the recorder thread
         if self.recorder_thread and self.recorder_thread.isRunning():
