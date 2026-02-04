@@ -251,8 +251,27 @@ class WorkerThread(QThread):
         self.processing_complete.emit()
     
     def _clean_markdown(self, text):
-        """Remove markdown symbols like *, **, etc."""
+        """Remove markdown symbols like *, **, etc. and emojis"""
         import re
+        
+        # Remove emojis (Unicode emoji ranges)
+        # This covers most common emojis including skin tone modifiers
+        emoji_pattern = re.compile(
+            "["
+            "\U0001F600-\U0001F64F"  # emoticons
+            "\U0001F300-\U0001F5FF"  # symbols & pictographs
+            "\U0001F680-\U0001F6FF"  # transport & map symbols
+            "\U0001F1E0-\U0001F1FF"  # flags (iOS)
+            "\U00002702-\U000027B0"
+            "\U000024C2-\U0001F251"
+            "\U0001F900-\U0001F9FF"  # Supplemental Symbols and Pictographs
+            "\U0001FA00-\U0001FA6F"  # Chess Symbols
+            "\U0001FA70-\U0001FAFF"  # Symbols and Pictographs Extended-A
+            "\U00002600-\U000026FF"  # Miscellaneous Symbols
+            "\U00002700-\U000027BF"  # Dingbats
+            "]+", flags=re.UNICODE
+        )
+        text = emoji_pattern.sub('', text)
         
         # Remove bold/italic markers
         text = re.sub(r'\*\*\*(.+?)\*\*\*', r'\1', text)  # ***text***
@@ -857,8 +876,27 @@ class LiveWorkerThread(QThread):
         return audio_data
     
     def _clean_markdown(self, text):
-        """Remove markdown symbols"""
+        """Remove markdown symbols and emojis"""
         import re
+        
+        # Remove emojis
+        emoji_pattern = re.compile(
+            "["
+            "\U0001F600-\U0001F64F"  # emoticons
+            "\U0001F300-\U0001F5FF"  # symbols & pictographs
+            "\U0001F680-\U0001F6FF"  # transport & map symbols
+            "\U0001F1E0-\U0001F1FF"  # flags (iOS)
+            "\U00002702-\U000027B0"
+            "\U000024C2-\U0001F251"
+            "\U0001F900-\U0001F9FF"  # Supplemental Symbols and Pictographs
+            "\U0001FA00-\U0001FA6F"  # Chess Symbols
+            "\U0001FA70-\U0001FAFF"  # Symbols and Pictographs Extended-A
+            "\U00002600-\U000026FF"  # Miscellaneous Symbols
+            "\U00002700-\U000027BF"  # Dingbats
+            "]+", flags=re.UNICODE
+        )
+        text = emoji_pattern.sub('', text)
+        
         text = re.sub(r'\*\*\*(.+?)\*\*\*', r'\1', text)
         text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
         text = re.sub(r'\*(.+?)\*', r'\1', text)
