@@ -10,7 +10,7 @@ import queue
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, 
     QHBoxLayout, QLabel, QScrollArea, QPushButton, 
-    QComboBox, QFrame, QSpacerItem, QSizePolicy, QLineEdit,
+    QComboBox, QFrame, QSpacerItem, QSizePolicy, QTextEdit,
     QDialog, QCheckBox, QStackedWidget, QGraphicsDropShadowEffect,
     QTextBrowser
 )
@@ -416,6 +416,28 @@ class UserMessageBubble(QFrame):
                 border: none;
             }}
         """)
+
+
+class CustomTextEdit(QTextEdit):
+    """QTextEdit personalizado que envía con Enter y permite nueva línea con Shift+Enter"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.send_callback = None
+    
+    def keyPressEvent(self, event):
+        """Manejar Enter para enviar, Shift+Enter para nueva línea"""
+        if event.key() == Qt.Key.Key_Return or event.key() == Qt.Key.Key_Enter:
+            if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                # Shift+Enter: insertar nueva línea
+                super().keyPressEvent(event)
+            else:
+                # Enter solo: enviar mensaje
+                if self.send_callback:
+                    self.send_callback()
+                event.accept()
+        else:
+            super().keyPressEvent(event)
 
 
 class BotMessageWidget(QFrame):
@@ -1492,23 +1514,24 @@ class MainWindow(QMainWindow):
         
         input_bar = QWidget()
         input_bar.setObjectName("inputBar")
-        input_bar.setFixedHeight(140)
         input_bar.setMaximumWidth(1200)
         input_bar.setMinimumWidth(1200)
+        input_bar.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
         input_layout = QVBoxLayout(input_bar)
-        input_layout.setContentsMargins(16, 12, 16, 16)
-        input_layout.setSpacing(10)
+        input_layout.setContentsMargins(16, 8, 16, 12)
+        input_layout.setSpacing(8)
         
-        # Text input row
+        # Text input row - PRIMERO (crece hacia arriba)
         text_row = QHBoxLayout()
         text_row.setSpacing(10)
         
         # Text input field
-        self.text_input = QLineEdit()
+        self.text_input = CustomTextEdit()
         self.text_input.setObjectName("textInput")
         self.text_input.setPlaceholderText("Type a message...")
+        self.text_input.send_callback = self.send_text_message
         self.text_input.setStyleSheet("""
-            QLineEdit {
+            QTextEdit {
                 background-color: #282A2C;
                 color: #E3E3E3;
                 border: 1px solid #3C4043;
@@ -1516,11 +1539,15 @@ class MainWindow(QMainWindow):
                 padding: 12px 18px;
                 font-size: 14px;
             }
-            QLineEdit:focus {
+            QTextEdit:focus {
                 border-color: #8AB4F8;
             }
         """)
-        self.text_input.returnPressed.connect(self.send_text_message)
+        self.text_input.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.text_input.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.text_input.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        self.text_input.setFixedHeight(48)
+        self.text_input.textChanged.connect(self.adjust_input_height)
         text_row.addWidget(self.text_input)
         
         # Send button
@@ -1532,7 +1559,7 @@ class MainWindow(QMainWindow):
         
         input_layout.addLayout(text_row)
         
-        # Button row (mic + status)
+        # Button row (mic + status) - SEGUNDO (abajo, fijo)
         button_row = QHBoxLayout()
         button_row.setSpacing(15)
         
@@ -1615,9 +1642,24 @@ class MainWindow(QMainWindow):
             self.send_btn.setEnabled(True)
             print("🛑 User interrupted playback")
     
+    def adjust_input_height(self):
+        """Ajusta la altura del input según el contenido (hasta 10 líneas)"""
+        doc = self.text_input.document()
+        doc_height = doc.size().height()
+        
+        # Calcular altura necesaria con padding
+        content_height = int(doc_height + 24)  # 12px padding top + 12px bottom
+        
+        # Límites: mínimo 48px (1 línea), máximo ~240px (10 líneas)
+        min_height = 48
+        max_height = 240
+        
+        new_height = max(min_height, min(content_height, max_height))
+        self.text_input.setFixedHeight(new_height)
+    
     def send_text_message(self):
         """Send a text message typed by user"""
-        text = self.text_input.text().strip()
+        text = self.text_input.toPlainText().strip()
         
         if not text:
             return
@@ -1635,6 +1677,7 @@ class MainWindow(QMainWindow):
         
         # Clear input
         self.text_input.clear()
+        self.text_input.setFixedHeight(48)
         
         # Start processing
         self.is_processing = True
