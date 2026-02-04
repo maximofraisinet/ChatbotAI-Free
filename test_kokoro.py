@@ -18,8 +18,8 @@ except Exception as e:
 # Test 2: Check files exist
 print("\n2. Checking model files...")
 import os
-model_path = "kokoro-v0_19.onnx"
-voices_path = "voices.json"
+model_path = "voices/english/kokoro-v0_19.onnx"
+voices_path = "voices/english/voices.json"
 
 if os.path.exists(model_path):
     size_mb = os.path.getsize(model_path) / (1024 * 1024)

@@ -19,7 +19,7 @@ except ImportError:
 class SherpaWrapper:
     """Wrapper around Sherpa-ONNX for Spanish TTS"""
     
-    def __init__(self, model_dir: str = "models/sherpa-spanish"):
+    def __init__(self, model_dir: str = "voices/spanish"):
         """
         Initialize Sherpa-ONNX TTS with Spanish voice model
         
@@ -219,19 +219,19 @@ def download_spanish_model():
     ║  1. Visit: https://voicepowered.ai/app/voice                       ║
     ║  2. Search for "Marta" (Spanish female voice)                      ║
     ║  3. Download the model files                                       ║
-    ║  4. Extract to: models/sherpa-spanish/                             ║
+    ║  4. Extract to: voices/spanish/                             ║
     ║                                                                    ║
     ║  Option 2: Sherpa-ONNX Pre-trained Models                          ║
     ║  ────────────────────────────────────────                          ║
     ║  1. Visit: https://github.com/k2-fsa/sherpa-onnx/releases          ║
     ║  2. Download a Spanish VITS model (e.g., vits-mms-spa)             ║
-    ║  3. Extract to: models/sherpa-spanish/                             ║
+    ║  3. Extract to: voices/spanish/                             ║
     ║                                                                    ║
     ║  Quick download (MMS Spanish):                                     ║
-    ║  cd models && mkdir -p sherpa-spanish && cd sherpa-spanish         ║
+    ║  cd voices && mkdir -p spanish && cd spanish         ║
     ║  wget https://huggingface.co/csukuangfj/vits-mms-spa/...           ║
     ║                                                                    ║
-    ║  Required files in models/sherpa-spanish/:                         ║
+    ║  Required files in voices/spanish/:                         ║
     ║    - model.onnx (or model.int8.onnx)                               ║
     ║    - tokens.txt                                                    ║
     ║    - (optional) espeak-ng-data/                                    ║

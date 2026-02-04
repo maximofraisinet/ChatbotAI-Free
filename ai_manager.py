@@ -25,11 +25,11 @@ class AIManager:
     def __init__(self, 
                  whisper_model="base",  # Use multilingual by default (not base.en)
                  ollama_model="llama3.1:8b",
-                 kokoro_model_path="kokoro-v0_19.onnx",
-                 voices_path="voices.json",
+                 kokoro_model_path="voices/english/kokoro-v0_19.onnx",
+                 voices_path="voices/english/voices.json",
                  voice_name="af_bella",
                  language="english",
-                 sherpa_model_dir="models/sherpa-spanish"):
+                 sherpa_model_dir="voices/spanish"):
         """
         Initialize all AI models
         

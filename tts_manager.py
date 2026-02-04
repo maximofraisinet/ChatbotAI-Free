@@ -19,11 +19,11 @@ class TTSManager:
         self,
         language: str = "english",
         # Kokoro config (English)
-        kokoro_model_path: str = "kokoro-v0_19.onnx",
-        voices_path: str = "voices.json",
+        kokoro_model_path: str = "voices/english/kokoro-v0_19.onnx",
+        voices_path: str = "voices/english/voices.json",
         kokoro_voice: str = "af_bella",
         # Sherpa config (Spanish)
-        sherpa_model_dir: str = "models/sherpa-spanish",
+        sherpa_model_dir: str = "voices/spanish",
         sherpa_speaker_id: int = 0,
     ):
         """
@@ -94,7 +94,7 @@ class TTSManager:
             self.sherpa_available = False
         except FileNotFoundError as e:
             print(f"⚠ Sherpa model not found: {e}")
-            print("  Download Spanish voice model to models/sherpa-spanish/")
+            print("  Download Spanish voice model to voices/spanish/")
             self.sherpa_available = False
         except Exception as e:
             print(f"⚠ Could not load Sherpa: {e}")
