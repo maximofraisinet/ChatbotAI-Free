@@ -21,3 +21,6 @@ onnxruntime-gpu>=1.16.0  # Use onnxruntime-gpu for CUDA support
 # Text-to-Speech (Sherpa-ONNX) - Spanish
 # Install separately: pip install sherpa-onnx
 # sherpa-onnx  # Uncomment if you want Spanish support
+
+# Note: Markdown rendering is done natively with regex - no additional library needed
+# The MarkdownRenderer class in main.py handles basic markdown formatting

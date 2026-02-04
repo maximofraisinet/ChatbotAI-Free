@@ -11,7 +11,8 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, 
     QHBoxLayout, QLabel, QScrollArea, QPushButton, 
     QComboBox, QFrame, QSpacerItem, QSizePolicy, QLineEdit,
-    QDialog, QCheckBox, QStackedWidget, QGraphicsDropShadowEffect
+    QDialog, QCheckBox, QStackedWidget, QGraphicsDropShadowEffect,
+    QTextBrowser
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, pyqtSlot, QTimer, QPropertyAnimation, QEasingCurve, QRect
 from PyQt6.QtGui import QFont, QColor
@@ -274,15 +275,290 @@ class WorkerThread(QThread):
         return text.strip()
 
 
+class MarkdownRenderer:
+    """Utility class to convert Markdown to HTML for display"""
+    
+    @staticmethod
+    def to_html(text, font_size=15):
+        """Convert markdown text to styled HTML"""
+        import re
+        
+        # Escape HTML special characters first (except for what we'll process)
+        text = text.replace('&', '&amp;')
+        text = text.replace('<', '&lt;')
+        text = text.replace('>', '&gt;')
+        
+        # Code blocks (```code```)
+        def code_block_replace(match):
+            lang = match.group(1) or ''
+            code = match.group(2).strip()
+            return f'''<div style="background-color: #1E1F20; border: 1px solid #3C4043; 
+                       border-radius: 8px; padding: 12px; margin: 8px 0; font-family: 'Consolas', 'Monaco', monospace; 
+                       font-size: {font_size - 1}px; overflow-x: auto; white-space: pre-wrap;">
+                       <code>{code}</code></div>'''
+        text = re.sub(r'```(\w*)\n?(.*?)```', code_block_replace, text, flags=re.DOTALL)
+        
+        # Inline code (`code`)
+        text = re.sub(r'`([^`]+)`', 
+                     rf'<code style="background-color: #282A2C; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: {font_size - 1}px;">\1</code>', 
+                     text)
+        
+        # Horizontal rules (--- or ***)
+        text = re.sub(r'^---+$', '<hr style="border: none; border-top: 1px solid #3C4043; margin: 8px 0;">', text, flags=re.MULTILINE)
+        text = re.sub(r'^\*\*\*+$', '<hr style="border: none; border-top: 1px solid #3C4043; margin: 8px 0;">', text, flags=re.MULTILINE)
+        
+        # Headers (#### Header, ### Header, etc.)
+        text = re.sub(r'^#### (.+)$', rf'<h4 style="font-size: {font_size + 2}px; font-weight: 600; margin: 8px 0 4px 0; color: #E3E3E3;">\1</h4>', text, flags=re.MULTILINE)
+        text = re.sub(r'^### (.+)$', rf'<h3 style="font-size: {font_size + 3}px; font-weight: 600; margin: 10px 0 5px 0; color: #E3E3E3;">\1</h3>', text, flags=re.MULTILINE)
+        text = re.sub(r'^## (.+)$', rf'<h2 style="font-size: {font_size + 5}px; font-weight: 600; margin: 12px 0 6px 0; color: #E3E3E3;">\1</h2>', text, flags=re.MULTILINE)
+        text = re.sub(r'^# (.+)$', rf'<h1 style="font-size: {font_size + 8}px; font-weight: 700; margin: 14px 0 8px 0; color: #E3E3E3;">\1</h1>', text, flags=re.MULTILINE)
+        
+        # Bold (**text** or __text__)
+        text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
+        text = re.sub(r'__(.+?)__', r'<strong>\1</strong>', text)
+        
+        # Italic (*text* or _text_)
+        text = re.sub(r'\*([^\*]+)\*', r'<em>\1</em>', text)
+        text = re.sub(r'_([^_]+)_', r'<em>\1</em>', text)
+        
+        # Lists disabled - showing as plain text for now
+        # Will keep the - or * or 1. 2. etc. as plain text
+        
+        # # Unordered lists (- item or * item) - DISABLED
+        # # Ordered lists (1. item) - DISABLED
+        
+        # Clean up extra newlines around block elements (lists, headers, hr)
+        text = re.sub(r'\n+(</?[uoh][lrl1-4]?>)', r'\1', text)  # Remove newlines before/after list/header tags
+        text = re.sub(r'(</?[uoh][lrl1-4]?>)\n+', r'\1', text)
+        text = re.sub(r'\n+(<hr[^>]*>)', r'\1', text)  # Remove newlines before hr
+        text = re.sub(r'(<hr[^>]*>)\n+', r'\1', text)  # Remove newlines after hr
+        text = re.sub(r'(</ul>|</ol>)\n+', r'\1', text)  # Remove newlines after closing list tags
+        text = re.sub(r'\n+(</li>)', r'\1', text)  # Remove newlines before closing li tags
+        
+        # Paragraphs (double newline) - but not around block elements
+        text = re.sub(r'\n\n+', '</p><p style="margin: 8px 0; line-height: 1.6;">', text)
+        
+        # Single newlines to <br> - but not after block elements
+        # First, protect block elements with a marker
+        text = re.sub(r'(</ul>|</ol>|</h[1-4]>|<hr[^>]*>)\n', r'\1<!-- BLOCK -->', text)
+        text = re.sub(r'\n(<ul|<ol|<h[1-4]|<hr)', r'<!-- BLOCK -->\1', text)
+        
+        # Now convert remaining newlines to <br>
+        text = text.replace('\n', '<br>')
+        
+        # Remove the markers
+        text = text.replace('<!-- BLOCK -->', '')
+        
+        # Wrap in paragraph (with minimal margin)
+        html = f'''<div style="margin: 0; line-height: 1.6;">{text}</div>'''
+        
+        return html
+
+
+class UserMessageBubble(QFrame):
+    """User message with bubble style - aligned right"""
+    
+    def __init__(self, text, font_size=15):
+        super().__init__()
+        self.setObjectName("userBubble")
+        self.font_size = font_size
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.label = QLabel(text)
+        self.label.setObjectName("userBubbleText")
+        self.label.setWordWrap(True)
+        self.label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.update_font_size(font_size)
+        
+        layout.addWidget(self.label)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
+        self.setMaximumWidth(900)
+    
+    def update_text(self, text):
+        """Update the bubble text content"""
+        self.label.setText(text)
+    
+    def update_font_size(self, font_size):
+        """Update the font size"""
+        self.font_size = font_size
+        self.label.setStyleSheet(f"""
+            color: #FFFFFF;
+            font-size: {font_size}px;
+            padding: 14px 20px;
+            background: transparent;
+            line-height: 1.5;
+        """)
+        self.setStyleSheet(f"""
+            QFrame#userBubble {{
+                background-color: #303136;
+                border-radius: 22px;
+                border: none;
+            }}
+        """)
+
+
+class BotMessageWidget(QFrame):
+    """Bot message with avatar and markdown-rendered text - no bubble"""
+    
+    def __init__(self, text, font_size=15):
+        super().__init__()
+        self.setObjectName("botMessage")
+        self.font_size = font_size
+        self._raw_text = text  # Store raw text for TTS
+        
+        self.setStyleSheet("background-color: transparent; border: none;")
+        
+        # Main horizontal layout: Avatar | Text
+        main_layout = QHBoxLayout(self)
+        main_layout.setContentsMargins(0, 8, 0, 8)
+        main_layout.setSpacing(12)
+        main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        
+        # Avatar
+        self.avatar = QLabel("✨")
+        self.avatar.setObjectName("botAvatar")
+        self.avatar.setFixedSize(32, 32)
+        self.avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.avatar.setStyleSheet("""
+            QLabel#botAvatar {
+                background-color: #8AB4F8;
+                border-radius: 16px;
+                color: #131314;
+                font-size: 16px;
+            }
+        """)
+        main_layout.addWidget(self.avatar, 0, Qt.AlignmentFlag.AlignTop)
+        
+        # Text content container
+        text_container = QWidget()
+        text_container.setStyleSheet("background-color: transparent;")
+        text_layout = QVBoxLayout(text_container)
+        text_layout.setContentsMargins(0, 0, 0, 0)
+        text_layout.setSpacing(0)
+        
+        # Markdown-rendered text using QTextBrowser
+        self.text_browser = QTextBrowser()
+        self.text_browser.setObjectName("markdownText")
+        self.text_browser.setOpenExternalLinks(True)
+        self.text_browser.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.text_browser.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.text_browser.setFrameShape(QFrame.Shape.NoFrame)
+        self.text_browser.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        
+        self.update_font_size(font_size)
+        self.update_text(text)
+        
+        text_layout.addWidget(self.text_browser)
+        main_layout.addWidget(text_container, 1)
+        
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+    
+    def update_text(self, text):
+        """Update the message text with markdown rendering"""
+        self._raw_text = text
+        html_content = MarkdownRenderer.to_html(text, self.font_size)
+        
+        # Full HTML document with styling
+        full_html = f'''
+        <html>
+        <head>
+            <style>
+                body {{
+                    color: #E3E3E3;
+                    font-family: 'Google Sans', 'Segoe UI', 'Roboto', Arial, sans-serif;
+                    font-size: {self.font_size}px;
+                    line-height: 1.5;
+                    margin: 0;
+                    padding: 0;
+                    background-color: transparent;
+                }}
+                ul, ol {{
+                    margin: 2px 0;
+                    padding-left: 20px;
+                    line-height: 1.2;
+                }}
+                li {{
+                    margin: 0;
+                    padding: 0;
+                    line-height: 1.2;
+                }}
+                strong {{
+                    font-weight: 600;
+                    color: #FFFFFF;
+                }}
+                em {{
+                    font-style: italic;
+                }}
+                code {{
+                    background-color: #282A2C;
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    font-family: 'Consolas', 'Monaco', monospace;
+                    font-size: {self.font_size - 1}px;
+                }}
+                a {{
+                    color: #8AB4F8;
+                    text-decoration: none;
+                }}
+                a:hover {{
+                    text-decoration: underline;
+                }}
+                h1, h2, h3, h4 {{
+                    margin: 8px 0 4px 0;
+                }}
+                hr {{
+                    border: none;
+                    border-top: 1px solid #3C4043;
+                    margin: 6px 0;
+                }}
+                p {{
+                    margin: 4px 0;
+                }}
+            </style>
+        </head>
+        <body>{html_content}</body>
+        </html>
+        '''
+        
+        self.text_browser.setHtml(full_html)
+        
+        # Adjust height to content
+        self.text_browser.document().setTextWidth(self.text_browser.viewport().width())
+        doc_height = self.text_browser.document().size().height()
+        self.text_browser.setMinimumHeight(int(doc_height) + 10)
+    
+    def update_font_size(self, font_size):
+        """Update the font size"""
+        self.font_size = font_size
+        self.text_browser.setStyleSheet(f"""
+            QTextBrowser#markdownText {{
+                background-color: transparent;
+                border: none;
+                color: #E3E3E3;
+                font-size: {font_size}px;
+                selection-background-color: #3C4043;
+            }}
+        """)
+        # Re-render text with new font size
+        if hasattr(self, '_raw_text'):
+            self.update_text(self._raw_text)
+    
+    def get_raw_text(self):
+        """Get the raw text (for TTS)"""
+        return self._raw_text
+
+
 class ChatBubble(QFrame):
-    """Modern chat bubble widget - responsive to window size"""
+    """Legacy chat bubble widget - kept for backwards compatibility"""
     
     def __init__(self, text, is_user=False, font_size=15):
         super().__init__()
         
         if is_user:
             self.setObjectName("userBubble")
-            self.setStyleSheet("background-color: #004A77; border-radius: 20px;")
+            self.setStyleSheet("background-color: #303136; border-radius: 22px;")
         else:
             self.setObjectName("botBubble")
             self.setStyleSheet("background-color: #1E1F20; border-radius: 20px;")
@@ -1018,8 +1294,8 @@ class MainWindow(QMainWindow):
         super().__init__()
         
         self.setWindowTitle("Voice Chat AI")
-        self.setGeometry(100, 100, 500, 800)
-        self.setMinimumSize(400, 600)
+        self.setGeometry(100, 100, 1400, 900)
+        self.setMinimumSize(1400, 900)
         
         # Load user preferences
         self.preferences = load_preferences()
@@ -1158,9 +1434,18 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.stacked_widget, 1)
         
         # ===== INPUT BAR =====
+        # Wrapper to center input bar
+        input_bar_wrapper = QWidget()
+        input_bar_wrapper.setStyleSheet("background-color: #131314;")
+        input_bar_wrapper_layout = QHBoxLayout(input_bar_wrapper)
+        input_bar_wrapper_layout.setContentsMargins(0, 0, 0, 0)
+        input_bar_wrapper_layout.addStretch()
+        
         input_bar = QWidget()
         input_bar.setObjectName("inputBar")
         input_bar.setFixedHeight(140)
+        input_bar.setMaximumWidth(1200)
+        input_bar.setMinimumWidth(1200)
         input_layout = QVBoxLayout(input_bar)
         input_layout.setContentsMargins(16, 12, 16, 16)
         input_layout.setSpacing(10)
@@ -1250,7 +1535,11 @@ class MainWindow(QMainWindow):
         button_row.addWidget(self.live_btn)
         
         input_layout.addLayout(button_row)
-        main_layout.addWidget(input_bar)
+        
+        input_bar_wrapper_layout.addWidget(input_bar)
+        input_bar_wrapper_layout.addStretch()
+        
+        main_layout.addWidget(input_bar_wrapper)
         
         # Store reference to input_bar for showing/hiding
         self.input_bar = input_bar
@@ -1614,15 +1903,15 @@ class MainWindow(QMainWindow):
     
     @pyqtSlot(str)
     def add_user_message(self, message):
-        """Add user bubble"""
+        """Add user message with bubble style - aligned right"""
         wrapper = QWidget()
+        wrapper.setStyleSheet("background-color: transparent;")
         wrapper_layout = QHBoxLayout(wrapper)
-        # Use percentage margins for responsive design
-        wrapper_layout.setContentsMargins(40, 0, 12, 0)
+        wrapper_layout.setContentsMargins(60, 4, 16, 4)
         wrapper_layout.addStretch()
         
         font_config = get_font_size_config(self.font_size_name)
-        bubble = ChatBubble(message, is_user=True, font_size=font_config["bubble_text"])
+        bubble = UserMessageBubble(message, font_size=font_config["bubble_text"])
         self.chat_bubbles.append(bubble)
         wrapper_layout.addWidget(bubble)
         
@@ -1631,17 +1920,30 @@ class MainWindow(QMainWindow):
     
     @pyqtSlot(str)
     def add_bot_message(self, message):
-        """Add bot bubble"""
+        """Add bot message with avatar and markdown - centered with fixed width"""
         wrapper = QWidget()
+        wrapper.setStyleSheet("background-color: transparent;")
         wrapper_layout = QHBoxLayout(wrapper)
-        # Use percentage margins for responsive design
-        wrapper_layout.setContentsMargins(12, 0, 40, 0)
+        wrapper_layout.setContentsMargins(0, 4, 0, 4)
+        
+        # Add stretch on both sides to center the bot message
+        wrapper_layout.addStretch()
+        
+        # Container with fixed width
+        bot_container = QWidget()
+        bot_container.setMaximumWidth(1000)
+        bot_container.setMinimumWidth(1000)
+        bot_container.setStyleSheet("background-color: transparent;")
+        bot_container_layout = QHBoxLayout(bot_container)
+        bot_container_layout.setContentsMargins(16, 0, 16, 0)
         
         font_config = get_font_size_config(self.font_size_name)
-        bubble = ChatBubble(message, is_user=False, font_size=font_config["bubble_text"])
-        self.chat_bubbles.append(bubble)
-        self.current_bot_bubble = bubble  # Track for streaming updates
-        wrapper_layout.addWidget(bubble)
+        bot_widget = BotMessageWidget(message, font_size=font_config["bubble_text"])
+        self.chat_bubbles.append(bot_widget)
+        self.current_bot_bubble = bot_widget  # Track for streaming updates
+        bot_container_layout.addWidget(bot_widget)
+        
+        wrapper_layout.addWidget(bot_container)
         wrapper_layout.addStretch()
         
         self.chat_layout.insertWidget(self.chat_layout.count() - 1, wrapper)
@@ -1658,12 +1960,15 @@ class MainWindow(QMainWindow):
                 pass  # Widget was deleted
     
     def scroll_to_bottom(self):
-        """Scroll to bottom of chat"""
-        QTimer.singleShot(100, lambda: 
-            self.scroll_area.verticalScrollBar().setValue(
-                self.scroll_area.verticalScrollBar().maximum()
+        """Scroll to bottom of chat only if user is already at the bottom"""
+        scrollbar = self.scroll_area.verticalScrollBar()
+        # Check if user is near the bottom (within 50 pixels)
+        is_at_bottom = scrollbar.value() >= scrollbar.maximum() - 50
+        
+        if is_at_bottom:
+            QTimer.singleShot(100, lambda: 
+                scrollbar.setValue(scrollbar.maximum())
             )
-        )
     
     def clear_chat(self):
         """Clear all messages"""

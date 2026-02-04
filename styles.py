@@ -1,6 +1,6 @@
 """
-Google Gemini-Inspired Dark Mode Styles
-Modern, minimal, clean design
+Google Gemini/ChatGPT-Inspired Dark Mode Styles
+Modern, minimal, clean design with distinct message styles
 """
 
 # Color Palette (Gemini Dark)
@@ -8,14 +8,16 @@ COLORS = {
     'background': '#131314',
     'surface': '#1E1F20',
     'surface_variant': '#282A2C',
-    'user_bubble': '#004A77',
-    'bot_bubble': '#1E1F20',
+    'user_bubble': '#303136',  # Gris oscuro suave para usuario
+    'bot_bubble': 'transparent',  # Sin fondo para bot
     'text_primary': '#E3E3E3',
     'text_secondary': '#9AA0A6',
     'accent': '#8AB4F8',
     'mic_button': '#1A73E8',
     'mic_recording': '#EA4335',
     'border': '#3C4043',
+    'code_bg': '#1E1F20',
+    'code_border': '#3C4043',
 }
 
 GEMINI_STYLE = """
@@ -107,19 +109,57 @@ QLabel#statusLabel {
     background: transparent;
 }
 
-/* ===== MESSAGE BUBBLES ===== */
+/* ===== USER MESSAGE BUBBLE (mantiene burbuja) ===== */
 QFrame#userBubble {
-    background-color: #004A77;
-    border-radius: 20px;
+    background-color: #303136;
+    border-radius: 22px;
     border: none;
 }
 
-QFrame#botBubble {
-    background-color: #1E1F20;
-    border-radius: 20px;
+/* ===== BOT MESSAGE CONTAINER (sin burbuja, estilo ChatGPT) ===== */
+QFrame#botMessage {
+    background-color: transparent;
     border: none;
+    border-radius: 0px;
 }
 
+/* ===== BOT AVATAR ===== */
+QLabel#botAvatar {
+    background-color: #8AB4F8;
+    border-radius: 16px;
+    color: #131314;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+/* ===== MESSAGE TEXT LABELS ===== */
+QLabel#userBubbleText {
+    color: #FFFFFF;
+    font-size: 15px;
+    padding: 14px 20px;
+    background: transparent;
+    line-height: 1.5;
+}
+
+QLabel#botMessageText {
+    color: #E3E3E3;
+    font-size: 15px;
+    padding: 4px 0px;
+    background: transparent;
+    line-height: 1.6;
+}
+
+/* ===== MARKDOWN STYLED TEXT (para QTextBrowser) ===== */
+QTextBrowser#markdownText {
+    background-color: transparent;
+    border: none;
+    color: #E3E3E3;
+    font-size: 15px;
+    line-height: 1.6;
+    selection-background-color: #3C4043;
+}
+
+/* ===== LEGACY BUBBLE TEXT (compatibilidad) ===== */
 QLabel#bubbleText {
     color: #E3E3E3;
     font-size: 15px;
@@ -131,6 +171,7 @@ QLabel#bubbleText {
 QWidget#inputBar {
     background-color: #1E1F20;
     border-top: 1px solid #282A2C;
+    border-radius: 16px;
 }
 
 /* ===== MIC BUTTON - Large Circular ===== */
