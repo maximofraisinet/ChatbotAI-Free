@@ -61,11 +61,9 @@ https://github.com/user-attachments/assets/c33bd6a7-a4ae-48cf-89c5-c72d019a0d53
 #### Step 1: Clone the Repository
 Clone this repository to your local machine:
 ```bash
-git clone https://github.com/your-username/ChatbotAI-English.git
+git clone https://github.com/Maximuszoo/ChatbotAI-Free
 cd ChatbotAI-English
 ```
-*(Remember to replace `your-username` with the actual repository URL)*
-
 #### Step 2: Create a Virtual Environment (Recommended)
 ```bash
 python3 -m venv venv
