@@ -4,7 +4,7 @@ A fully local voice chatbot designed for practicing **English** and **Spanish** 
 
 ---
 
-### ✨ Live Mode in Action
+### ✨ ChatbotAI-Free in Action
 
 **Normal Mode**
 ![Screenshot of Normal Mode](https://github.com/user-attachments/assets/0030e384-f9c8-47ee-aa90-2c4a955bc27b)
