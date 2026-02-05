@@ -329,13 +329,14 @@ class AIManager:
             print(f"LLM error: {e}")
             return "I'm sorry, I couldn't process that request."
     
-    def text_to_speech(self, text):
+    def text_to_speech(self, text, speed=1.0):
         """
         Convert text to speech using the appropriate TTS engine
         (Kokoro for English, Sherpa for Spanish)
         
         Args:
             text: Text to synthesize
+            speed: Voice speed multiplier (default 1.0)
             
         Returns:
             tuple: (numpy array of audio samples, sample_rate)
@@ -347,8 +348,7 @@ class AIManager:
             return np.zeros(24000, dtype=np.float32), 24000
         
         try:
-            # Use TTS Manager to route to appropriate engine
-            speed = 0.80 if self.language == "spanish" else 1.0
+            # Use TTS Manager to route to appropriate engine with user-defined speed
             samples, sample_rate = self.tts_manager.create(text, speed=speed)
             
             print(f"TTS returned: sample_rate={sample_rate}, samples={len(samples)}")

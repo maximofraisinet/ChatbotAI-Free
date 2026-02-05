@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout, QLabel, QScrollArea, QPushButton, 
     QComboBox, QFrame, QSpacerItem, QSizePolicy, QTextEdit,
     QDialog, QCheckBox, QStackedWidget, QGraphicsDropShadowEffect,
-    QTextBrowser
+    QTextBrowser, QSlider
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, pyqtSlot, QTimer, QPropertyAnimation, QEasingCurve, QRect
 from PyQt6.QtGui import QFont, QColor
@@ -93,13 +93,14 @@ class WorkerThread(QThread):
     processing_complete = pyqtSignal()
     speaking_started = pyqtSignal()  # Signal when TTS starts playing
     
-    def __init__(self, ai_manager, audio_player):
+    def __init__(self, ai_manager, audio_player, voice_speed=1.0):
         super().__init__()
         self.ai_manager = ai_manager
         self.audio_player = audio_player
         self.audio_data = None
         self.text_input = None  # For text messages
         self.interrupted = False
+        self.voice_speed = voice_speed
     
     def set_audio(self, audio_data):
         """Set audio data to process"""
@@ -203,7 +204,7 @@ class WorkerThread(QThread):
                 try:
                     sentence = sentence_queue.get(timeout=0.1)
                     if sentence and not self.interrupted:
-                        audio_output, sample_rate = self.ai_manager.text_to_speech(sentence)
+                        audio_output, sample_rate = self.ai_manager.text_to_speech(sentence, speed=self.voice_speed)
                         if audio_output is not None and len(audio_output) > 0:
                             audio_queue.put((audio_output, sample_rate))
                             if not first_audio_ready.is_set():
@@ -641,7 +642,7 @@ class LiveWorkerThread(QThread):
     speaking_finished = pyqtSignal()
     error_occurred = pyqtSignal(str)
     
-    def __init__(self, ai_manager, audio_recorder, audio_player):
+    def __init__(self, ai_manager, audio_recorder, audio_player, voice_speed=1.0):
         super().__init__()
         self.ai_manager = ai_manager
         self.recorder = audio_recorder
@@ -651,6 +652,7 @@ class LiveWorkerThread(QThread):
         self.interrupted = False
         self.user_speaking = threading.Event()  # Signal for barge-in
         self.monitor_thread = None
+        self.voice_speed = voice_speed
     
     def run(self):
         """Main loop for continuous conversation with barge-in detection"""
@@ -738,7 +740,7 @@ class LiveWorkerThread(QThread):
                     try:
                         sentence = sentence_queue.get(timeout=0.1)
                         if sentence:
-                            audio_output, sample_rate = self.ai_manager.text_to_speech(sentence)
+                            audio_output, sample_rate = self.ai_manager.text_to_speech(sentence, speed=self.voice_speed)
                             if audio_output is not None and len(audio_output) > 0:
                                 audio_queue.put((audio_output, sample_rate))
                     except queue.Empty:
@@ -1060,7 +1062,7 @@ class LiveModeWidget(QWidget):
         
         # Start worker thread
         self.worker_thread = LiveWorkerThread(
-            self.ai_manager, self.recorder, self.player
+            self.ai_manager, self.recorder, self.player, self.parent_window.voice_speed
         )
         self.worker_thread.status_changed.connect(self.update_state)
         # No conectar transcription ni response_chunk para no mostrar texto
@@ -1149,13 +1151,14 @@ class LiveModeWidget(QWidget):
 class SettingsDialog(QDialog):
     """Settings dialog with font size and language options"""
     
-    def __init__(self, parent=None, auto_send=True, font_size="medium", language="english"):
+    def __init__(self, parent=None, auto_send=True, font_size="medium", language="english", voice_speed=1.0):
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.setMinimumWidth(350)
         self.auto_send = auto_send
         self.font_size = font_size
         self.language = language
+        self.voice_speed = voice_speed
         
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
@@ -1269,11 +1272,66 @@ class SettingsDialog(QDialog):
         """)
         layout.addWidget(self.font_size_combo)
         
-        # Separator 2
-        separator2 = QFrame()
-        separator2.setFrameShape(QFrame.Shape.HLine)
-        separator2.setStyleSheet("background-color: #3C4043;")
-        layout.addWidget(separator2)
+        # Separator 3
+        separator3 = QFrame()
+        separator3.setFrameShape(QFrame.Shape.HLine)
+        separator3.setStyleSheet("background-color: #3C4043;")
+        layout.addWidget(separator3)
+        
+        # Voice speed setting
+        speed_label = QLabel("🔊 Voice Speed:")
+        speed_label.setStyleSheet("font-size: 14px; color: #E3E3E3; margin-top: 10px;")
+        layout.addWidget(speed_label)
+        
+        # Speed value display
+        self.speed_value_label = QLabel(f"{self.voice_speed:.2f}x")
+        self.speed_value_label.setStyleSheet("font-size: 13px; color: #8AB4F8; font-weight: bold;")
+        layout.addWidget(self.speed_value_label)
+        
+        # Speed slider
+        self.speed_slider = QSlider(Qt.Orientation.Horizontal)
+        self.speed_slider.setMinimum(50)  # 0.5x
+        self.speed_slider.setMaximum(200)  # 2.0x
+        self.speed_slider.setValue(int(self.voice_speed * 100))
+        self.speed_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self.speed_slider.setTickInterval(25)
+        self.speed_slider.valueChanged.connect(self.update_speed_label)
+        self.speed_slider.setStyleSheet("""
+            QSlider::groove:horizontal {
+                border: 1px solid #3C4043;
+                height: 6px;
+                background: #282A2C;
+                border-radius: 3px;
+            }
+            QSlider::handle:horizontal {
+                background: #1A73E8;
+                border: 2px solid #1A73E8;
+                width: 16px;
+                height: 16px;
+                margin: -6px 0;
+                border-radius: 8px;
+            }
+            QSlider::handle:horizontal:hover {
+                background: #1557b0;
+                border-color: #1557b0;
+            }
+            QSlider::sub-page:horizontal {
+                background: #1A73E8;
+                border-radius: 3px;
+            }
+        """)
+        layout.addWidget(self.speed_slider)
+        
+        speed_help = QLabel("Adjust voice playback speed (0.5x slow - 2.0x fast)")
+        speed_help.setWordWrap(True)
+        speed_help.setStyleSheet("font-size: 11px; color: #9AA0A6; margin-left: 4px;")
+        layout.addWidget(speed_help)
+        
+        # Separator 4
+        separator4 = QFrame()
+        separator4.setFrameShape(QFrame.Shape.HLine)
+        separator4.setStyleSheet("background-color: #3C4043;")
+        layout.addWidget(separator4)
         
         # Voice mode setting
         mode_label = QLabel("Voice Recording Mode:")
@@ -1335,6 +1393,11 @@ class SettingsDialog(QDialog):
             }
         """)
     
+    def update_speed_label(self, value):
+        """Actualizar etiqueta de velocidad al mover el slider"""
+        speed = value / 100.0
+        self.speed_value_label.setText(f"{speed:.2f}x")
+    
     def get_auto_send(self):
         return self.auto_send_checkbox.isChecked()
     
@@ -1345,6 +1408,9 @@ class SettingsDialog(QDialog):
     def get_language(self):
         lang_names = ["english", "spanish"]
         return lang_names[self.language_combo.currentIndex()]
+    
+    def get_voice_speed(self):
+        return self.speed_slider.value() / 100.0
 
 
 class MainWindow(QMainWindow):
@@ -1367,6 +1433,7 @@ class MainWindow(QMainWindow):
         self.auto_send = self.preferences.get("auto_send", True)
         self.font_size_name = self.preferences.get("font_size", "medium")
         self.language = self.preferences.get("language", "english")
+        self.voice_speed = self.preferences.get("voice_speed", 1.0)
         self.chat_bubbles = []  # Track bubbles for font size updates
         
         # Initialize components
@@ -1686,7 +1753,7 @@ class MainWindow(QMainWindow):
         self.status_label.setText("Processing...")
         
         # Start worker thread with text
-        self.worker_thread = WorkerThread(self.ai_manager, self.player)
+        self.worker_thread = WorkerThread(self.ai_manager, self.player, self.voice_speed)
         self.worker_thread.set_text(text)
         self.worker_thread.status_changed.connect(self.update_status)
         self.worker_thread.user_message.connect(self.add_user_message)
@@ -1810,7 +1877,7 @@ class MainWindow(QMainWindow):
         self.status_label.setText("Processing...")
         
         # Start worker thread
-        self.worker_thread = WorkerThread(self.ai_manager, self.player)
+        self.worker_thread = WorkerThread(self.ai_manager, self.player, self.voice_speed)
         self.worker_thread.set_audio(audio_data)
         self.worker_thread.status_changed.connect(self.update_status)
         self.worker_thread.user_message.connect(self.add_user_message)
@@ -1868,24 +1935,33 @@ class MainWindow(QMainWindow):
     
     def open_settings(self):
         """Open settings dialog"""
-        dialog = SettingsDialog(self, self.auto_send, self.font_size_name, self.language)
+        dialog = SettingsDialog(self, self.auto_send, self.font_size_name, self.language, self.voice_speed)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.auto_send = dialog.get_auto_send()
             new_font_size = dialog.get_font_size()
             new_language = dialog.get_language()
+            new_voice_speed = dialog.get_voice_speed()
             
             # Update font size if changed
             if new_font_size != self.font_size_name:
                 self.font_size_name = new_font_size
                 self.apply_font_size()
             
+            # Update voice speed
+            self.voice_speed = new_voice_speed
+            
             # Update language if changed
             if new_language != self.language:
                 old_language = self.language
                 self.language = new_language
+                
+                # Resetear velocidad a 1.0 al cambiar idioma
+                self.voice_speed = 1.0
+                
                 if self.ai_manager:
                     self.ai_manager.set_language(new_language)
                 print(f"🌐 Language changed to: {new_language}")
+                print(f"🔊 Voice speed reset to: 1.0x")
                 
                 # Show language change notification in chat
                 lang_display = "Español" if new_language == "spanish" else "English"
@@ -1895,11 +1971,12 @@ class MainWindow(QMainWindow):
             self.preferences["auto_send"] = self.auto_send
             self.preferences["font_size"] = self.font_size_name
             self.preferences["language"] = self.language
+            self.preferences["voice_speed"] = self.voice_speed
             save_preferences(self.preferences)
             
             mode_name = "Auto-send" if self.auto_send else "Manual review"
             lang_display = "English" if self.language == "english" else "Español"
-            print(f"⚙️ Settings updated - Mode: {mode_name}, Font: {self.font_size_name}, Lang: {lang_display}")
+            print(f"⚙️ Settings updated - Mode: {mode_name}, Font: {self.font_size_name}, Lang: {lang_display}, Speed: {self.voice_speed:.2f}x")
     
     def _get_language_change_message(self, language):
         """Get language change notification message"""

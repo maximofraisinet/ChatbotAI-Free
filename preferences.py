@@ -30,6 +30,7 @@ DEFAULT_PREFERENCES = {
     "auto_send": True,
     "font_size": "medium",  # small, medium, large
     "language": "english",  # english, spanish
+    "voice_speed": 1.0,  # Voice speed multiplier (0.5 to 2.0)
 }
 
 FONT_SIZES = {
