@@ -1,0 +1,8 @@
+# This folder should contain Spanish voice models
+# Each voice should be in its own subdirectory
+# Example structure:
+# voices/spanish/
+#   Daniela/
+#     es_AR-daniela-high.onnx
+#     tokens.txt
+#     espeak-ng-data/

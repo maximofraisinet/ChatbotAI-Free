@@ -55,7 +55,14 @@ user_preferences.json
 # PyCharm
 .idea/
 
-# AI Models (large files - too big for GitHub)
+# Voice models and data (large files - too big for GitHub)
+# Keep folder structure but ignore contents
+voices/english/*
+voices/spanish/*
+!voices/english/.gitkeep
+!voices/spanish/.gitkeep
+
+# Legacy paths (keeping for backwards compatibility)
 *.onnx
 voices.json
 

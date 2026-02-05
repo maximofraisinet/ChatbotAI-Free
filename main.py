@@ -1436,16 +1436,30 @@ class MainWindow(QMainWindow):
         self.voice_speed = self.preferences.get("voice_speed", 1.0)
         self.chat_bubbles = []  # Track bubbles for font size updates
         
+        # Voice preferences
+        self.english_voice = self.preferences.get("english_voice", "af_bella")
+        self.spanish_voice = self.preferences.get("spanish_voice", "Daniela")
+        
+        # Detect available voices
+        from voice_detector import get_english_voices, get_spanish_voices
+        self.available_english_voices = get_english_voices()
+        self.available_spanish_voices = list(get_spanish_voices().keys())
+        
         # Initialize components
         self.recorder = AudioRecorder()
         self.player = AudioPlayer()
         self.recorder_thread = None
         self.worker_thread = None
         
-        # Load AI Manager with language setting
+        # Load AI Manager with language and voice settings
         print("Loading AI models...")
         try:
-            self.ai_manager = AIManager(language=self.language)
+            current_voice = self.english_voice if self.language == "english" else self.spanish_voice
+            self.ai_manager = AIManager(
+                language=self.language,
+                voice_name=self.english_voice,
+                sherpa_voice=self.spanish_voice
+            )
         except Exception as e:
             print(f"Error initializing AI: {e}")
             self.ai_manager = None
@@ -1511,6 +1525,20 @@ class MainWindow(QMainWindow):
         
         self.model_selector.currentTextChanged.connect(self.on_model_changed)
         header_layout.addWidget(self.model_selector)
+        
+        # Voice Selector (next to model selector)
+        header_layout.addSpacing(20)
+        
+        voice_label = QLabel("🎤")
+        voice_label.setStyleSheet("font-size: 18px; color: #9AA0A6;")
+        header_layout.addWidget(voice_label)
+        
+        self.voice_selector = QComboBox()
+        self.voice_selector.setObjectName("voiceSelector")
+        self.voice_selector.setMinimumWidth(150)
+        self.update_voice_list()  # Populate based on current language
+        self.voice_selector.currentTextChanged.connect(self.on_voice_changed)
+        header_layout.addWidget(self.voice_selector)
         
         header_layout.addStretch()
         
@@ -1963,6 +1991,9 @@ class MainWindow(QMainWindow):
                 print(f"🌐 Language changed to: {new_language}")
                 print(f"🔊 Voice speed reset to: 1.0x")
                 
+                # Update voice selector for new language
+                self.update_voice_list()
+                
                 # Show language change notification in chat
                 lang_display = "Español" if new_language == "spanish" else "English"
                 self.add_bot_message(f"🌐 {self._get_language_change_message(new_language)}")
@@ -1972,11 +2003,54 @@ class MainWindow(QMainWindow):
             self.preferences["font_size"] = self.font_size_name
             self.preferences["language"] = self.language
             self.preferences["voice_speed"] = self.voice_speed
+            self.preferences["english_voice"] = self.english_voice
+            self.preferences["spanish_voice"] = self.spanish_voice
             save_preferences(self.preferences)
             
             mode_name = "Auto-send" if self.auto_send else "Manual review"
             lang_display = "English" if self.language == "english" else "Español"
             print(f"⚙️ Settings updated - Mode: {mode_name}, Font: {self.font_size_name}, Lang: {lang_display}, Speed: {self.voice_speed:.2f}x")
+    
+    def update_voice_list(self):
+        """Update voice selector based on current language"""
+        self.voice_selector.clear()
+        
+        if self.language == "english":
+            self.voice_selector.addItems(self.available_english_voices)
+            # Set saved English voice
+            if self.english_voice in self.available_english_voices:
+                idx = self.voice_selector.findText(self.english_voice)
+                if idx >= 0:
+                    self.voice_selector.setCurrentIndex(idx)
+        else:  # spanish
+            self.voice_selector.addItems(self.available_spanish_voices)
+            # Set saved Spanish voice
+            if self.spanish_voice in self.available_spanish_voices:
+                idx = self.voice_selector.findText(self.spanish_voice)
+                if idx >= 0:
+                    self.voice_selector.setCurrentIndex(idx)
+    
+    def on_voice_changed(self, voice_name):
+        """Handle voice selection change"""
+        if not voice_name:
+            return
+        
+        # Save voice preference based on language
+        if self.language == "english":
+            self.english_voice = voice_name
+        else:
+            self.spanish_voice = voice_name
+        
+        # Update AI manager
+        if self.ai_manager:
+            self.ai_manager.set_voice(voice_name)
+        
+        # Save preferences
+        self.preferences["english_voice"] = self.english_voice
+        self.preferences["spanish_voice"] = self.spanish_voice
+        save_preferences(self.preferences)
+        
+        print(f"🎤 Voice changed to: {voice_name}")
     
     def _get_language_change_message(self, language):
         """Get language change notification message"""

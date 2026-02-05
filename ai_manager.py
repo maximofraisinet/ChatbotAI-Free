@@ -29,7 +29,8 @@ class AIManager:
                  voices_path="voices/english/voices.json",
                  voice_name="af_bella",
                  language="english",
-                 sherpa_model_dir="voices/spanish"):
+                 sherpa_model_dir="voices/spanish",
+                 sherpa_voice="Daniela"):
         """
         Initialize all AI models
         
@@ -38,13 +39,15 @@ class AIManager:
             ollama_model: Ollama model name
             kokoro_model_path: Path to Kokoro ONNX model
             voices_path: Path to voices.json
-            voice_name: Voice to use (af_bella or af_sarah)
+            voice_name: English voice to use (af_bella, af_sarah, etc.)
             language: Current language ("english" or "spanish")
-            sherpa_model_dir: Directory with Sherpa Spanish model
+            sherpa_model_dir: Base directory for Spanish voices
+            sherpa_voice: Spanish voice name (Daniela, Marta, etc.)
         """
         print("Initializing AI Manager...")
         
         self.language = language
+        self.current_voice = voice_name if language == "english" else sherpa_voice
         
         # Check CUDA availability
         try:
@@ -89,6 +92,7 @@ class AIManager:
                     voices_path=voices_path,
                     kokoro_voice=voice_name,
                     sherpa_model_dir=sherpa_model_dir,
+                    sherpa_voice_name=sherpa_voice,
                 )
                 self.tts_available = self.tts_manager.is_available()
             except Exception as e:
@@ -203,6 +207,25 @@ class AIManager:
         if self.tts_manager:
             self.tts_manager.set_language(language)
             self.tts_available = self.tts_manager.is_available()
+    
+    def set_voice(self, voice_name: str):
+        """
+        Change the current voice (handles both English and Spanish)
+        
+        Args:
+            voice_name: Voice name (e.g., "af_bella" for English, "Daniela" for Spanish)
+        """
+        self.current_voice = voice_name
+        
+        if not self.tts_manager:
+            return
+        
+        if self.language == "english":
+            self.tts_manager.set_kokoro_voice(voice_name)
+        elif self.language == "spanish":
+            self.tts_manager.set_sherpa_voice(voice_name)
+        
+        print(f"🎤 Voice changed to: {voice_name}")
     
     def get_llm_response(self, user_text):
         """

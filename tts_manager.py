@@ -24,6 +24,7 @@ class TTSManager:
         kokoro_voice: str = "af_bella",
         # Sherpa config (Spanish)
         sherpa_model_dir: str = "voices/spanish",
+        sherpa_voice_name: str = "Daniela",
         sherpa_speaker_id: int = 0,
     ):
         """
@@ -34,11 +35,14 @@ class TTSManager:
             kokoro_model_path: Path to Kokoro ONNX model
             voices_path: Path to Kokoro voices.json
             kokoro_voice: Kokoro voice name (e.g., "af_bella")
-            sherpa_model_dir: Directory with Sherpa model files
+            sherpa_model_dir: Base directory for Spanish voices (voices/spanish)
+            sherpa_voice_name: Spanish voice subdirectory name (e.g., "Daniela", "Marta")
             sherpa_speaker_id: Speaker ID for Sherpa (multi-speaker models)
         """
         self.language = language
         self.kokoro_voice = kokoro_voice
+        self.sherpa_voice_name = sherpa_voice_name
+        self.sherpa_model_dir = sherpa_model_dir
         self.sherpa_speaker_id = sherpa_speaker_id
         
         # Engine instances
@@ -85,9 +89,11 @@ class TTSManager:
                 self.sherpa_available = False
                 return
             
-            self.sherpa = SherpaWrapper(model_dir)
+            # Use subdirectory for specific voice
+            voice_dir = f"{model_dir}/{self.sherpa_voice_name}"
+            self.sherpa = SherpaWrapper(voice_dir)
             self.sherpa_available = True
-            print("✓ Sherpa TTS (Spanish) loaded successfully!")
+            print(f"✓ Sherpa TTS (Spanish - {self.sherpa_voice_name}) loaded successfully!")
             
         except ImportError as e:
             print(f"⚠ Sherpa not available: {e}")
@@ -118,6 +124,21 @@ class TTSManager:
         """Set the Kokoro voice for English TTS"""
         self.kokoro_voice = voice_name
         print(f"🎤 Kokoro voice set to: {voice_name}")
+    
+    def set_sherpa_voice(self, voice_name: str):
+        """Change the Spanish voice (reloads Sherpa with new voice directory)"""
+        if voice_name == self.sherpa_voice_name:
+            return  # Already using this voice
+        
+        self.sherpa_voice_name = voice_name
+        print(f"🎤 Changing Spanish voice to: {voice_name}")
+        
+        # Reload Sherpa with new voice directory
+        try:
+            self._init_sherpa(self.sherpa_model_dir)
+        except Exception as e:
+            print(f"⚠ Failed to load voice {voice_name}: {e}")
+            self.sherpa_available = False
     
     def set_sherpa_speaker(self, speaker_id: int):
         """Set the speaker ID for Sherpa (multi-speaker models)"""

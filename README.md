@@ -1,317 +1,164 @@
-# Voice Chatbot - AI Language Practice Assistant 🎙️🤖
+# 🎙️🤖 Voice Chatbot: AI Language Practice Assistant
 
-A fully local voice chatbot with two conversation modes: **Classic Chat** and **Live Mode**. Built to help practice **English** and **Spanish** conversation skills through natural AI interactions with high-quality voices.
+A fully local voice chatbot designed for practicing **English** and **Spanish** conversation skills. It features high-quality, natural-sounding AI voices and operates in two distinct modes: **Classic Chat** and continuous **Live Mode**.
 
-## About This Project 💡
-
-I created this chatbot as a personal tool to:
-- **Practice my English and Spanish** through realistic conversations with native-sounding voices
-- **Learn more** about AI integration, speech processing, and UI development
-- Experiment with real-time streaming and voice activity detection
 ---
-**Normal mode**
-<img width="1082" height="799" alt="Captura de pantalla_20260106_172859" src="https://github.com/user-attachments/assets/0030e384-f9c8-47ee-aa90-2c4a955bc27b" />
+
+### ✨ Live Mode in Action
+
+*(A short GIF demonstrating the live conversation flow would be perfect here!)*
+
+**Normal Mode**
+![Screenshot of Normal Mode](https://github.com/user-attachments/assets/0030e384-f9c8-47ee-aa90-2c4a955bc27b)
 
 https://github.com/user-attachments/assets/56a0d0cb-73ae-42df-8c5a-3f0938419d29
 
-**Live mode**
-<img width="1083" height="799" alt="Captura de pantalla_20260106_172956" src="https://github.com/user-attachments/assets/33e8d5dc-4310-4248-ba22-4b16085958b9" />
+**Live Mode**
+![Screenshot of Live Mode](https://github.com/user-attachments/assets/33e8d5dc-4310-4248-ba22-4b16085958b9)
 
 https://github.com/user-attachments/assets/c33bd6a7-a4ae-48cf-89c5-c72d019a0d53
 
 ---
 
-## Features ✨
+## 🚀 Features
 
-### 🌐 Multi-Language Support
-- **English**: Kokoro ONNX TTS for natural speech
-- **Español**: Sherpa-ONNX TTS with Daniela voice (high-quality Argentine Spanish)
-- Easy language switching in settings - change anytime without restarting
-- Automatic language detection for speech recognition
+- **🌐 Multi-Language Support**: Seamlessly switch between English (Kokoro TTS) and Spanish (Sherpa-ONNX TTS).
+- **🎯 Dual Conversation Modes**:
+    - **Classic Chat**: Traditional turn-by-turn conversation.
+    - **Live Mode**: Hands-free, continuous conversation with barge-in capability (interrupt the AI naturally).
+- **🗣️ Advanced Voice Capabilities**:
+    - Real-time, multilingual Speech-to-Text (via `faster-whisper`).
+    - High-quality, natural Text-to-Speech output.
+    - Voice Activity Detection (VAD) for precise end-of-speech detection.
+- **🧠 Local & Private AI**:
+    - Powered by local LLMs through **Ollama** (e.g., Llama 3.1, Mistral, Gemma 2).
+    - Streaming responses for instant audio and text feedback.
+    - Context-aware conversations with persistent history.
+- **🎨 Modern & Customizable UI**:
+    - Sleek dark theme inspired by Google Gemini.
+    - Adjustable font sizes and voice playback speeds.
+    - Visual feedback for voice activity.
+- **⚙️ Smart & Persistent**: User preferences (model, language, voice, etc.) are saved locally.
 
-### 🎯 Dual Mode Interface
-- **Classic Chat Mode**: Traditional message-by-message conversation with text input and voice recording
-- **Live Mode**: Continuous hands-free conversation with real-time barge-in (interrupt the AI anytime by speaking)
+## 🛠️ Technology Stack
 
-### 🗣️ Voice Capabilities
-- Real-time speech-to-text (Whisper) - supports English and Spanish
-- Natural text-to-speech output (Kokoro for English, Sherpa for Spanish)
-- Voice Activity Detection (VAD) for automatic silence detection
+| Component            | Technology                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------ |
+| **Application & UI** | Python, PyQt6                                                                                          |
+| **LLM Inference**    | [Ollama](https://ollama.ai/) (Llama 3.1, Mistral, etc.)                                                  |
+| **Speech-to-Text**   | [faster-whisper](https://github.com/guillaumekln/faster-whisper)                                         |
+| **Text-to-Speech**   | [Kokoro TTS](https://github.com/thewh1teagle/kokoro-onnx) (English), [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx) (Spanish) |
+| **Audio I/O**        | PyAudio / sounddevice, NumPy                                                                           |
 
-### 🧠 AI Features
-- Local LLM conversations powered by Ollama (Llama, Mistral, etc.)
-- **Streaming responses** - See and hear AI responses as they're generated
-- Conversation history with context awareness
+## 📦 Getting Started
 
-### 🎨 Modern UI
-- Dark theme inspired by Google Gemini
-- Responsive chat bubbles
-- Customizable font sizes (small, medium, large)
-- Live Mode with pulsing visual indicator
+### 1. Prerequisites
 
-### ⚡ Smart Features
-- Barge-in detection - Interrupt the AI naturally by speaking
-- User preferences saved locally (model, font size, auto-send mode, language)
-- Multi-threaded for smooth performance
+- **Python** 3.10 or 3.11
+- **Ollama**: Make sure it is installed and running. Download from [ollama.ai](https://ollama.ai/).
+- **Git**
 
-## Installation 📦
+### 2. Installation & Setup
 
-### Prerequisites
-
-**All Systems:**
-- **Python 3.10 or 3.11**
-- **Ollama** - Download from [ollama.ai](https://ollama.ai)
-
-### 📦 What's Included vs. What to Download
-
-**Included in the repository:**
-- ✅ All Python code
-- ✅ `tokens.txt` for Spanish voice (small file)
-- ✅ Configuration files
-
-**Must be downloaded separately (too large for GitHub):**
-- ❌ `kokoro-v0_19.onnx` (~310 MB) - English TTS
-- ❌ `voices.json` - English voice configs
-- ❌ `es_AR-daniela-high.onnx` (~108 MB) - Spanish TTS
-- ❌ `espeak-ng-data/` - Phoneme data for Spanish
-
-### Linux Installation 🐧
-
-1. **Install system dependencies:**
+#### Step 1: Clone the Repository
+Clone this repository to your local machine:
 ```bash
-# Ubuntu/Debian
-sudo apt update
-sudo apt install python3 python3-pip portaudio19-dev
-
-# Arch Linux
-sudo pacman -S python python-pip portaudio
-```
-
-2. **Clone or download this repository:**
-```bash
-cd ~/your-projects-folder
-git clone <your-repo-url>
+git clone https://github.com/your-username/ChatbotAI-English.git
 cd ChatbotAI-English
 ```
+*(Remember to replace `your-username` with the actual repository URL)*
 
-3. **Create virtual environment (recommended):**
+#### Step 2: Create a Virtual Environment (Recommended)
 ```bash
 python3 -m venv venv
 source venv/bin/activate
+# On Windows, use: venv\Scripts\activate
 ```
 
-4. **Install Python dependencies:**
+#### Step 3: Install Dependencies
+Install all required Python packages from `requirements.txt`:
 ```bash
 pip install -r requirements.txt
 ```
-
-5. **Download required model files:**
-
-⚠️ **Important**: These files are too large for GitHub (310+ MB) and must be downloaded separately.
-
-- **Kokoro TTS Model** (`kokoro-v0_19.onnx`):
-  - Download from: [Kokoro-82M releases](https://github.com/thewh1teagle/kokoro-onnx/releases)
-  - Place in `voices/english/` folder
+For **NVIDIA GPU** support (recommended for `faster-whisper`), ensure you have CUDA installed and install the GPU-enabled `onnxruntime`:
 ```bash
-mkdir -p voices/english
-cd voices/english
-wget https://huggingface.co/thewh1teagle/Kokoro/resolve/main/kokoro-v0_19.onnx
-cd ../..
+pip install onnxruntime-gpu
 ```
 
-- **Voice Configurations** (`voices.json`):
-  - Download from: [Kokoro-82M releases](https://github.com/thewh1teagle/kokoro-onnx/releases)
-  - Place in `voices/english/` folder
-```bash
-cd voices/english
-wget https://huggingface.co/thewh1teagle/Kokoro/resolve/main/voices.json
-cd ../..
+#### Step 4: Download TTS Models
+The TTS models are too large for GitHub and must be downloaded manually.
+
+**A. English TTS Model (Kokoro)**
+1.  Download the following files from the [Kokoro-82M releases](https://github.com/thewh1teagle/kokoro-onnx/releases) page:
+    - `kokoro-v0_19.onnx`
+    - `voices.json`
+2.  Place both files inside the `voices/english/` directory.
+
+**B. Spanish TTS Models (Sherpa-ONNX)** (Optional)
+The application automatically detects any Spanish voice installed in the `voices/spanish/` directory.
+
+1.  First, install the `sherpa-onnx` package:
+    ```bash
+    pip install sherpa-onnx
+    ```
+2.  For each voice you want to add, download the model files from the [Piper-Voices Hugging Face repos](https://huggingface.co/csukuangfj).
+    - [Daniela (Argentine Spanish)](https://huggingface.co/csukuangfj/vits-piper-es_AR-daniela-high/tree/main)
+    - [Miro (European Spanish)](https://huggingface.co/csukuangfj/vits-piper-es_ES-miro-high/tree/main)
+
+3.  Create a sub-folder for each voice inside `voices/spanish/` (e.g., `voices/spanish/Daniela/`).
+4.  Download and place the following three files into the new sub-folder:
+    - The `.onnx` model file.
+    - `tokens.txt`
+    - The `espeak-ng-data/` directory (extract it from the `.tar.bz2` archive).
+
+Your final `voices` directory should look like this:
+```
+voices/
+├── english/
+│   ├── kokoro-v0_19.onnx    # English TTS model
+│   └── voices.json          # English voice configs
+└── spanish/
+    ├── Daniela/             # Spanish voice 1
+    │   ├── es_AR-daniela-high.onnx
+    │   ├── tokens.txt
+    │   └── espeak-ng-data/
+    └── Miro/                # Spanish voice 2
+        ├── es_ES-miro-high.onnx
+        ├── tokens.txt
+        └── espeak-ng-data/
 ```
 
-Your folder structure should look like:
-```
-ChatbotAI-English/
-├── main.py
-├── ai_manager.py
-├── ...
-└── voices/
-    └── english/
-        ├── kokoro-v0_19.onnx    ← Download this (English TTS)
-        └── voices.json           ← Download this (English TTS)
-```
-
-6. **(Optional) Spanish TTS Support with Sherpa-ONNX:**
-
-If you want Spanish language support with **Daniela voice** (high-quality Argentine Spanish):
-
-```bash
-# Install sherpa-onnx
-pip install sherpa-onnx
-
-# Create directory for Spanish model
-mkdir -p voices/spanish
-cd voices/spanish
-
-# Download Daniela voice model (108 MB - not included in repo)
-wget https://huggingface.co/csukuangfj/vits-piper-es_AR-daniela-high/resolve/main/es_AR-daniela-high.onnx
-
-# Download tokens file (already included in repo, but you can get it from:)
-# wget https://huggingface.co/csukuangfj/vits-piper-es_AR-daniela-high/resolve/main/tokens.txt
-
-# Download espeak-ng data (required for phoneme processing)
-wget https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/espeak-ng-data.tar.bz2
-tar -xjf espeak-ng-data.tar.bz2
-rm espeak-ng-data.tar.bz2
-
-cd ../..
-```
-
-**Note**: The `tokens.txt` file is already included in the repository. You only need to download the `.onnx` model file and espeak-ng data.
-
-Your `voices/spanish/` folder should contain:
-```
-voices/spanish/
-├── es_AR-daniela-high.onnx   (download this - 108 MB)
-├── tokens.txt                 (already in repo)
-└── espeak-ng-data/           (download and extract)
-```
-
-7. **Install an Ollama model:**
+#### Step 5: Pull an Ollama Model
+Download a model for Ollama to use. `llama3.1:8b` is a great starting point.
 ```bash
 ollama pull llama3.1:8b
-# or try other models: mistral, gemma2, etc.
 ```
 
-8. **Run the application:**
+### 3. Run the Application
+Launch the chatbot with:
 ```bash
 python main.py
 ```
 
-### Windows Installation 🪟
+## ⌨️ Usage
 
-1. **Install Python:**
-   - Download Python 3.11 from [python.org](https://www.python.org/downloads/)
-   - ✅ **Important**: Check "Add Python to PATH" during installation
+- **🧠 Model & Voice Selection**: Use the dropdown menus at the top to select your desired Ollama model and TTS voice.
+- **⚙️ Settings**: Click the gear icon to configure:
+    - **Language**: English or Spanish.
+    - **Voice Speed**: Adjust playback rate from 0.5x to 2.0x.
+    - **Font Size**: Small, Medium, or Large.
+    - **Voice Mode**: Toggle between auto-sending your recording or reviewing it first.
 
-2. **Install Ollama:**
-   - Download from [ollama.ai](https://ollama.ai)
-   - Run the installer
+## 🤝 Contributing
 
-3. **Download this project:**
-   - Download as ZIP or clone with Git
-   - Extract to a folder like `C:\Users\YourName\ChatbotAI-English`
+Contributions are welcome! If you have ideas for new features, bug fixes, or improvements, please open an issue or submit a pull request.
 
-4. **Open Command Prompt in the project folder:**
-   - Navigate to the folder in File Explorer
-   - Type `cmd` in the address bar and press Enter
+1.  Fork the Project
+2.  Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3.  Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4.  Push to the Branch (`git push origin feature/AmazingFeature`)
+5.  Open a Pull Request
 
-5. **Create virtual environment (recommended):**
-```cmd
-python -m venv venv
-venv\Scripts\activate
-```
+## 📄 License
 
-6. **Install dependencies:**
-```cmd
-pip install -r requirements.txt
-```
-
-7. **Download required model files:**
-
-⚠️ **Important**: These files are too large for GitHub and must be downloaded separately.
-
-- **Kokoro TTS Model** (`kokoro-v0_19.onnx`):
-  - Download from: [Kokoro-82M releases](https://github.com/thewh1teagle/kokoro-onnx/releases)
-  - Place in `voices\english\` folder
-
-- **Voice Configurations** (`voices.json`):
-  - Download from: [Kokoro-82M releases](https://github.com/thewh1teagle/kokoro-onnx/releases)
-  - Place in `voices\english\` folder
-
-8. **(Optional) Spanish TTS with Daniela voice:**
-
-```cmd
-pip install sherpa-onnx
-
-mkdir voices\spanish
-cd voices\spanish
-
-REM Download Daniela voice model (not included in repo - 108 MB)
-curl -L -o es_AR-daniela-high.onnx https://huggingface.co/csukuangfj/vits-piper-es_AR-daniela-high/resolve/main/es_AR-daniela-high.onnx
-
-REM Download espeak-ng data
-curl -L -o espeak-ng-data.tar.bz2 https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/espeak-ng-data.tar.bz2
-tar -xjf espeak-ng-data.tar.bz2
-del espeak-ng-data.tar.bz2
-
-cd ..\..
-```
-
-**Note**: `tokens.txt` is already included in the repository.
-
-9. **Install an Ollama model:**
-```cmd
-ollama pull llama3.1:8b
-```
-
-10. **Run the application:**
-```cmd
-python main.py
-```
-
-## Usage 🚀
-
-### Classic Chat Mode
-1. Type messages or use the 🎤 microphone button
-2. Press ⏹ while recording to send
-3. Choose between auto-send or manual review mode in settings (⚙️)
-
-### Live Mode (Continuous Conversation)
-1. Click the ✨ button to enter Live Mode
-2. Speak naturally - the AI listens continuously
-3. Interrupt anytime by speaking over the AI
-4. Use 🎤 to mute your input (AI keeps speaking)
-5. Click ✕ to return to Chat Mode
-
-### Settings ⚙️
-- **Language**: English or Español (changes STT and TTS engines)
-- **Font Size**: Small, Medium, or Large
-- **Voice Mode**: Auto-send after recording or Manual review
-- **Model Selection**: Switch between available Ollama models
-
-## Technologies Used 🛠️
-
-- **Python & PyQt6** - Application framework and UI
-- **Whisper** (via faster-whisper) - Multilingual speech-to-text (English & Spanish)
-- **Ollama** (streaming mode) - Local LLM inference with streaming responses
-- **Kokoro ONNX** - Text-to-speech synthesis (English voices)
-- **Sherpa-ONNX** - Text-to-speech synthesis (Spanish - Daniela voice)
-- **PyAudio/sounddevice** - Audio I/O
-- **NumPy** - Audio processing
-
-## Project Structure 📁
-
-```
-ChatbotAI-English/
-├── main.py              # Main application & UI
-├── ai_manager.py        # AI model coordination (Whisper, Ollama, TTS)
-├── tts_manager.py       # Hybrid TTS manager (Kokoro + Sherpa)
-├── kokoro_wrapper.py    # Kokoro ONNX wrapper (English TTS)
-├── sherpa_wrapper.py    # Sherpa-ONNX wrapper (Spanish TTS)
-├── audio_utils.py       # Audio recording and playback
-├── styles.py            # UI styling (Gemini-inspired dark theme)
-├── preferences.py       # User settings persistence
-├── requirements.txt     # Python dependencies
-└── voices/
-    ├── english/         # English TTS models (Kokoro)
-    │   ├── kokoro-v0_19.onnx  (download separately - 310 MB)
-    │   └── voices.json        (download separately)
-    └── spanish/         # Spanish TTS model (Sherpa-ONNX)
-        ├── es_AR-daniela-high.onnx  (download separately - 108 MB)
-        ├── tokens.txt               (included in repo)
-        └── espeak-ng-data/          (download and extract)
-```
-
-## License 📄
-
-The Unlicense
+This project is licensed under **The Unlicense**. See the `LICENSE` file for details.

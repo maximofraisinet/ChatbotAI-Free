@@ -101,6 +101,55 @@ QComboBox#modelSelector QAbstractItemView::item:hover {
     background-color: #3C4043;
 }
 
+/* ===== VOICE SELECTOR ===== */
+QComboBox#voiceSelector {
+    background-color: #282A2C;
+    color: #E3E3E3;
+    border: 1px solid #3C4043;
+    border-radius: 18px;
+    padding: 10px 20px;
+    font-size: 13px;
+    min-width: 150px;
+}
+
+QComboBox#voiceSelector:hover {
+    background-color: #3C4043;
+    border-color: #5F6368;
+}
+
+QComboBox#voiceSelector::drop-down {
+    border: none;
+    padding-right: 15px;
+}
+
+QComboBox#voiceSelector::down-arrow {
+    image: none;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid #9AA0A6;
+    margin-right: 10px;
+}
+
+QComboBox#voiceSelector QAbstractItemView {
+    background-color: #282A2C;
+    color: #E3E3E3;
+    selection-background-color: #3C4043;
+    border: 1px solid #3C4043;
+    border-radius: 12px;
+    padding: 8px;
+    outline: none;
+}
+
+QComboBox#voiceSelector QAbstractItemView::item {
+    padding: 10px 16px;
+    border-radius: 8px;
+    margin: 2px 4px;
+}
+
+QComboBox#voiceSelector QAbstractItemView::item:hover {
+    background-color: #3C4043;
+}
+
 /* ===== STATUS LABEL ===== */
 QLabel#statusLabel {
     color: #9AA0A6;
