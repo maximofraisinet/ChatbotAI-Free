@@ -1151,14 +1151,15 @@ class LiveModeWidget(QWidget):
 class SettingsDialog(QDialog):
     """Settings dialog with font size and language options"""
     
-    def __init__(self, parent=None, auto_send=True, font_size="medium", language="english", voice_speed=1.0):
+    def __init__(self, parent=None, auto_send=True, font_size="medium", language="english", voice_speed=1.0, output_device=-1):
         super().__init__(parent)
         self.setWindowTitle("Settings")
-        self.setMinimumWidth(350)
+        self.setMinimumWidth(400)
         self.auto_send = auto_send
         self.font_size = font_size
         self.language = language
         self.voice_speed = voice_speed
+        self.output_device = output_device
         
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 20, 20, 20)
@@ -1326,7 +1327,70 @@ class SettingsDialog(QDialog):
         speed_help.setWordWrap(True)
         speed_help.setStyleSheet("font-size: 11px; color: #9AA0A6; margin-left: 4px;")
         layout.addWidget(speed_help)
-        
+
+        # Separator audio device
+        sep_dev = QFrame()
+        sep_dev.setFrameShape(QFrame.Shape.HLine)
+        sep_dev.setStyleSheet("background-color: #3C4043;")
+        layout.addWidget(sep_dev)
+
+        # ===== AUDIO OUTPUT DEVICE =====
+        import sounddevice as sd_dev
+        dev_label = QLabel("🔈 Audio Output Device:")
+        dev_label.setStyleSheet("font-size: 14px; color: #E3E3E3; margin-top: 10px;")
+        layout.addWidget(dev_label)
+
+        self.device_combo = QComboBox()
+        combo_style = """
+            QComboBox {
+                background-color: #282A2C;
+                color: #E3E3E3;
+                border: 1px solid #3C4043;
+                border-radius: 8px;
+                padding: 8px 16px;
+                font-size: 13px;
+                min-width: 120px;
+            }
+            QComboBox:hover { background-color: #3C4043; }
+            QComboBox::drop-down { border: none; padding-right: 10px; }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 6px solid #9AA0A6;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #282A2C;
+                color: #E3E3E3;
+                selection-background-color: #3C4043;
+                border: 1px solid #3C4043;
+                border-radius: 8px;
+                padding: 4px;
+            }
+        """
+        self.device_combo.setStyleSheet(combo_style)
+        # Populate with output devices
+        self._device_indices = [-1]
+        self.device_combo.addItem("System Default")
+        selected_combo_idx = 0
+        try:
+            for i, d in enumerate(sd_dev.query_devices()):
+                if d['max_output_channels'] > 0:
+                    self._device_indices.append(i)
+                    label = f"{d['name']}  ({int(d['default_samplerate'])}Hz)"
+                    self.device_combo.addItem(label)
+                    if i == output_device:
+                        selected_combo_idx = len(self._device_indices) - 1
+        except Exception:
+            pass
+        self.device_combo.setCurrentIndex(selected_combo_idx)
+        layout.addWidget(self.device_combo)
+
+        dev_help = QLabel("Select where TTS audio is played back.")
+        dev_help.setWordWrap(True)
+        dev_help.setStyleSheet("font-size: 11px; color: #9AA0A6; margin-left: 4px;")
+        layout.addWidget(dev_help)
+
         # Separator 4
         separator4 = QFrame()
         separator4.setFrameShape(QFrame.Shape.HLine)
@@ -1412,6 +1476,9 @@ class SettingsDialog(QDialog):
     def get_voice_speed(self):
         return self.speed_slider.value() / 100.0
 
+    def get_output_device(self):
+        return self._device_indices[self.device_combo.currentIndex()]
+
 
 class MainWindow(QMainWindow):
     """Main application window - Gemini Style"""
@@ -1446,8 +1513,9 @@ class MainWindow(QMainWindow):
         self.available_spanish_voices = list(get_spanish_voices().keys())
         
         # Initialize components
+        self.output_device = self.preferences.get("output_device", -1)
         self.recorder = AudioRecorder()
-        self.player = AudioPlayer()
+        self.player = AudioPlayer(device=self.output_device if self.output_device >= 0 else None)
         self.recorder_thread = None
         self.worker_thread = None
         
@@ -1963,12 +2031,13 @@ class MainWindow(QMainWindow):
     
     def open_settings(self):
         """Open settings dialog"""
-        dialog = SettingsDialog(self, self.auto_send, self.font_size_name, self.language, self.voice_speed)
+        dialog = SettingsDialog(self, self.auto_send, self.font_size_name, self.language, self.voice_speed, self.output_device)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.auto_send = dialog.get_auto_send()
             new_font_size = dialog.get_font_size()
             new_language = dialog.get_language()
             new_voice_speed = dialog.get_voice_speed()
+            new_output_device = dialog.get_output_device()
             
             # Update font size if changed
             if new_font_size != self.font_size_name:
@@ -1998,6 +2067,12 @@ class MainWindow(QMainWindow):
                 lang_display = "Español" if new_language == "spanish" else "English"
                 self.add_bot_message(f"🌐 {self._get_language_change_message(new_language)}")
             
+            # Update output device if changed
+            if new_output_device != self.output_device:
+                self.output_device = new_output_device
+                self.player.device = new_output_device if new_output_device >= 0 else None
+                print(f"🔈 Audio output device changed to index: {new_output_device}")
+
             # Save preferences
             self.preferences["auto_send"] = self.auto_send
             self.preferences["font_size"] = self.font_size_name
@@ -2005,6 +2080,7 @@ class MainWindow(QMainWindow):
             self.preferences["voice_speed"] = self.voice_speed
             self.preferences["english_voice"] = self.english_voice
             self.preferences["spanish_voice"] = self.spanish_voice
+            self.preferences["output_device"] = self.output_device
             save_preferences(self.preferences)
             
             mode_name = "Auto-send" if self.auto_send else "Manual review"

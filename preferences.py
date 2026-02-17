@@ -33,6 +33,7 @@ DEFAULT_PREFERENCES = {
     "voice_speed": 1.0,  # Voice speed multiplier (0.5 to 2.0)
     "english_voice": "af_bella",  # English voice preference
     "spanish_voice": "Daniela",  # Spanish voice preference
+    "output_device": -1,  # Audio output device index (-1 = system default)
 }
 
 FONT_SIZES = {

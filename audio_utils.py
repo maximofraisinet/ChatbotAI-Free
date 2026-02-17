@@ -160,8 +160,9 @@ class AudioRecorder:
 class AudioPlayer:
     """Plays audio with threading support"""
     
-    def __init__(self, sample_rate=24000):
+    def __init__(self, sample_rate=24000, device=None):
         self.sample_rate = sample_rate
+        self.device = device  # None = system default, int = specific device index
         self.is_playing = False
         self.should_stop = False
     
@@ -192,11 +193,28 @@ class AudioPlayer:
                 audio_data = audio_data / max_val
                 print(f"Normalized audio from max {max_val}")
             
+            # Resample to device's native rate if needed (avoids paInvalidSampleRate)
+            try:
+                out_device = self.device if self.device is not None and self.device >= 0 else sd.default.device[1]
+                device_info = sd.query_devices(out_device, 'output')
+                device_rate = int(device_info['default_samplerate'])
+            except Exception:
+                device_rate = actual_rate
+                out_device = self.device if self.device is not None and self.device >= 0 else None
+
+            if actual_rate != device_rate:
+                new_length = int(len(audio_data) * device_rate / actual_rate)
+                old_idx = np.arange(len(audio_data))
+                new_idx = np.linspace(0, len(audio_data) - 1, new_length)
+                audio_data = np.interp(new_idx, old_idx, audio_data).astype(np.float32)
+                print(f"Resampled audio from {actual_rate}Hz to {device_rate}Hz")
+                actual_rate = device_rate
+
             print(f"Playing audio: {len(audio_data)} samples at {actual_rate}Hz")
             print(f"Duration: {len(audio_data) / actual_rate:.2f} seconds")
             print(f"Audio range: [{audio_data.min():.3f}, {audio_data.max():.3f}]")
             
-            sd.play(audio_data, actual_rate)
+            sd.play(audio_data, actual_rate, device=out_device)
             
             # Wait in small increments so we can check for stop signal
             import time
