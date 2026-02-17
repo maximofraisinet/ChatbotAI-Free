@@ -982,6 +982,7 @@ class LiveModeWidget(QWidget):
         self.ai_manager = ai_manager
         self.recorder = audio_recorder
         self.player = audio_player
+        self.parent_window = parent  # Referencia a MainWindow para acceder a voice_speed
         self.worker_thread = None
         self.is_active = False
         
