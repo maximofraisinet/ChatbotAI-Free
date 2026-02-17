@@ -34,6 +34,7 @@ DEFAULT_PREFERENCES = {
     "english_voice": "af_bella",  # English voice preference
     "spanish_voice": "Daniela",  # Spanish voice preference
     "output_device": -1,  # Audio output device index (-1 = system default)
+    "input_device": -1,  # Audio input device index (-1 = system default)
 }
 
 FONT_SIZES = {

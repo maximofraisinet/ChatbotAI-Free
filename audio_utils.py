@@ -13,18 +13,21 @@ from collections import deque
 class AudioRecorder:
     """Records audio with Voice Activity Detection"""
     
-    def __init__(self, sample_rate=16000, silence_threshold=0.03, silence_duration=3.0, min_audio_duration=1.0):
+    def __init__(self, sample_rate=16000, silence_threshold=0.03, silence_duration=3.0, min_audio_duration=1.0, device=None):
         """
         Args:
             sample_rate: Audio sample rate (Hz)
             silence_threshold: RMS threshold for silence detection (increased to avoid noise)
             silence_duration: Seconds of silence before stopping recording
             min_audio_duration: Minimum audio duration in seconds to process
+            device: Input device index (None = system default)
         """
-        self.sample_rate = sample_rate
+        self.sample_rate = sample_rate          # tasa objetivo (Whisper)
         self.silence_threshold = silence_threshold
         self.silence_duration = silence_duration
         self.min_audio_duration = min_audio_duration
+        self.device = device
+        self._record_rate = sample_rate  # tasa real usada al grabar (puede diferir)
         
         self.audio_queue = queue.Queue()
         self.is_recording = False
@@ -49,12 +52,23 @@ class AudioRecorder:
                 break
         
         if self.stream is None:
+            # Detect native rate of the selected device to avoid paInvalidSampleRate
+            try:
+                dev_info = sd.query_devices(self.device, 'input') if self.device is not None else sd.query_devices(sd.default.device[0], 'input')
+                native_rate = int(dev_info['default_samplerate'])
+            except Exception:
+                native_rate = self.sample_rate
+            self._record_rate = native_rate
+            if native_rate != self.sample_rate:
+                print(f"Microphone native rate {native_rate}Hz → will resample to {self.sample_rate}Hz for STT")
+
             self.stream = sd.InputStream(
-                samplerate=self.sample_rate,
+                samplerate=self._record_rate,
                 channels=1,
                 dtype='float32',
                 callback=self._audio_callback,
-                blocksize=1024
+                blocksize=1024,
+                device=self.device
             )
             self.stream.start()
             print("Audio stream started")
@@ -102,8 +116,8 @@ class AudioRecorder:
         
         audio_buffer = []
         silence_frames = 0
-        silence_frames_needed = int(self.silence_duration * self.sample_rate / 1024)
-        max_frames = int(max_duration * self.sample_rate / 1024)
+        silence_frames_needed = int(self.silence_duration * self._record_rate / 1024)
+        max_frames = int(max_duration * self._record_rate / 1024)
         frame_count = 0
         speech_detected = False
         
@@ -147,6 +161,14 @@ class AudioRecorder:
         if not speech_detected:
             return None
         
+        # Resample to target sample_rate (16000 Hz for Whisper) if needed
+        if self._record_rate != self.sample_rate:
+            new_length = int(len(audio_data) * self.sample_rate / self._record_rate)
+            old_idx = np.arange(len(audio_data))
+            new_idx = np.linspace(0, len(audio_data) - 1, new_length)
+            audio_data = np.interp(new_idx, old_idx, audio_data).astype(np.float32)
+            print(f"Resampled recorded audio from {self._record_rate}Hz to {self.sample_rate}Hz")
+
         # Check minimum duration (filter out clicks, breaths, noise)
         audio_duration = len(audio_data) / self.sample_rate
         if audio_duration < self.min_audio_duration:

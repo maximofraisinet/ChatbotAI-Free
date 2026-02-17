@@ -66,9 +66,18 @@ class ManualRecorderThread(QThread):
         
         if self.audio_chunks:
             audio_data = np.concatenate(self.audio_chunks, axis=0).flatten()
-            duration = len(audio_data) / self.recorder.sample_rate
-            print(f"🎤 Recording stopped. Duration: {duration:.2f}s")
-            
+            record_rate = getattr(self.recorder, '_record_rate', self.recorder.sample_rate)
+            duration = len(audio_data) / record_rate
+            print(f"🎤 Recording stopped. Duration: {duration:.2f}s at {record_rate}Hz")
+
+            # Resample to target rate (16000 Hz) if recorded at a different rate
+            if record_rate != self.recorder.sample_rate:
+                new_length = int(len(audio_data) * self.recorder.sample_rate / record_rate)
+                old_idx = np.arange(len(audio_data))
+                new_idx = np.linspace(0, len(audio_data) - 1, new_length)
+                audio_data = np.interp(new_idx, old_idx, audio_data).astype(np.float32)
+                print(f"Resampled mic audio {record_rate}Hz → {self.recorder.sample_rate}Hz")
+
             # Only emit if we have meaningful audio (> 0.5 seconds)
             if duration > 0.5:
                 self.recording_finished.emit(audio_data)
@@ -857,8 +866,9 @@ class LiveWorkerThread(QThread):
         audio_buffer = []
         silence_frames = 0
         silence_threshold = self.recorder.silence_threshold
-        silence_frames_needed = int(1.5 * self.recorder.sample_rate / 1024)  # 1.5 sec silence
-        max_frames = int(30 * self.recorder.sample_rate / 1024)  # 30 sec max
+        record_rate = getattr(self.recorder, '_record_rate', self.recorder.sample_rate)
+        silence_frames_needed = int(1.5 * record_rate / 1024)  # 1.5 sec silence
+        max_frames = int(30 * record_rate / 1024)  # 30 sec max
         frame_count = 0
         speech_detected = False
         
@@ -892,6 +902,16 @@ class LiveWorkerThread(QThread):
             return None
         
         audio_data = np.concatenate(audio_buffer, axis=0).flatten()
+
+        # Resample to target rate (16000 Hz for Whisper) if needed
+        record_rate = getattr(self.recorder, '_record_rate', self.recorder.sample_rate)
+        if record_rate != self.recorder.sample_rate:
+            new_length = int(len(audio_data) * self.recorder.sample_rate / record_rate)
+            old_idx = np.arange(len(audio_data))
+            new_idx = np.linspace(0, len(audio_data) - 1, new_length)
+            audio_data = np.interp(new_idx, old_idx, audio_data).astype(np.float32)
+            print(f"Resampled VAD audio {record_rate}Hz → {self.recorder.sample_rate}Hz")
+
         duration = len(audio_data) / self.recorder.sample_rate
         
         if duration < 0.5:
@@ -1151,20 +1171,53 @@ class LiveModeWidget(QWidget):
 class SettingsDialog(QDialog):
     """Settings dialog with font size and language options"""
     
-    def __init__(self, parent=None, auto_send=True, font_size="medium", language="english", voice_speed=1.0, output_device=-1):
+    def __init__(self, parent=None, auto_send=True, font_size="medium", language="english", voice_speed=1.0, output_device=-1, input_device=-1):
         super().__init__(parent)
         self.setWindowTitle("Settings")
-        self.setMinimumWidth(400)
+        self.setMinimumWidth(440)
+        self.setMinimumHeight(500)
         self.auto_send = auto_send
         self.font_size = font_size
         self.language = language
         self.voice_speed = voice_speed
         self.output_device = output_device
-        
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
+        self.input_device = input_device
+
+        # Outer layout: scroll area (contenido) + botón guardar (fijo abajo)
+        from PyQt6.QtWidgets import QScrollArea
+        outer_layout = QVBoxLayout(self)
+        outer_layout.setContentsMargins(20, 20, 20, 20)
+        outer_layout.setSpacing(10)
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setStyleSheet("""
+            QScrollArea { background: transparent; border: none; }
+            QScrollBar:vertical {
+                background: #2A2B2E;
+                width: 8px;
+                border-radius: 4px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: #5F6368;
+                border-radius: 4px;
+                min-height: 30px;
+            }
+            QScrollBar::handle:vertical:hover { background: #9AA0A6; }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
+        """)
+
+        scroll_content = QWidget()
+        scroll_content.setStyleSheet("background: transparent;")
+        layout = QVBoxLayout(scroll_content)
+        layout.setContentsMargins(0, 0, 12, 0)
         layout.setSpacing(15)
-        
+
+        scroll_area.setWidget(scroll_content)
+        outer_layout.addWidget(scroll_area)
+
         # Title
         title = QLabel("⚙️ Settings")
         title.setStyleSheet("font-size: 18px; font-weight: bold; color: #E3E3E3;")
@@ -1391,6 +1444,40 @@ class SettingsDialog(QDialog):
         dev_help.setStyleSheet("font-size: 11px; color: #9AA0A6; margin-left: 4px;")
         layout.addWidget(dev_help)
 
+        # Separator mic
+        sep_mic = QFrame()
+        sep_mic.setFrameShape(QFrame.Shape.HLine)
+        sep_mic.setStyleSheet("background-color: #3C4043;")
+        layout.addWidget(sep_mic)
+
+        # ===== AUDIO INPUT DEVICE (MICROPHONE) =====
+        mic_label = QLabel("🎤 Microphone Input Device:")
+        mic_label.setStyleSheet("font-size: 14px; color: #E3E3E3; margin-top: 10px;")
+        layout.addWidget(mic_label)
+
+        self.mic_combo = QComboBox()
+        self.mic_combo.setStyleSheet(combo_style)
+        self._mic_indices = [-1]
+        self.mic_combo.addItem("System Default")
+        selected_mic_idx = 0
+        try:
+            for i, d in enumerate(sd_dev.query_devices()):
+                if d['max_input_channels'] > 0:
+                    self._mic_indices.append(i)
+                    mic_item = f"{d['name']}  ({int(d['default_samplerate'])}Hz)"
+                    self.mic_combo.addItem(mic_item)
+                    if i == input_device:
+                        selected_mic_idx = len(self._mic_indices) - 1
+        except Exception:
+            pass
+        self.mic_combo.setCurrentIndex(selected_mic_idx)
+        layout.addWidget(self.mic_combo)
+
+        mic_help = QLabel("Select the microphone used to record your voice.")
+        mic_help.setWordWrap(True)
+        mic_help.setStyleSheet("font-size: 11px; color: #9AA0A6; margin-left: 4px;")
+        layout.addWidget(mic_help)
+
         # Separator 4
         separator4 = QFrame()
         separator4.setFrameShape(QFrame.Shape.HLine)
@@ -1430,8 +1517,8 @@ class SettingsDialog(QDialog):
         layout.addWidget(help_text)
         
         layout.addStretch()
-        
-        # Close button
+
+        # Close button fijo fuera del scroll
         close_btn = QPushButton("Save & Close")
         close_btn.setStyleSheet("""
             QPushButton {
@@ -1448,8 +1535,8 @@ class SettingsDialog(QDialog):
             }
         """)
         close_btn.clicked.connect(self.accept)
-        layout.addWidget(close_btn)
-        
+        outer_layout.addWidget(close_btn)
+
         # Set dialog background
         self.setStyleSheet("""
             QDialog {
@@ -1478,6 +1565,9 @@ class SettingsDialog(QDialog):
 
     def get_output_device(self):
         return self._device_indices[self.device_combo.currentIndex()]
+
+    def get_input_device(self):
+        return self._mic_indices[self.mic_combo.currentIndex()]
 
 
 class MainWindow(QMainWindow):
@@ -1514,7 +1604,8 @@ class MainWindow(QMainWindow):
         
         # Initialize components
         self.output_device = self.preferences.get("output_device", -1)
-        self.recorder = AudioRecorder()
+        self.input_device = self.preferences.get("input_device", -1)
+        self.recorder = AudioRecorder(device=self.input_device if self.input_device >= 0 else None)
         self.player = AudioPlayer(device=self.output_device if self.output_device >= 0 else None)
         self.recorder_thread = None
         self.worker_thread = None
@@ -2031,13 +2122,14 @@ class MainWindow(QMainWindow):
     
     def open_settings(self):
         """Open settings dialog"""
-        dialog = SettingsDialog(self, self.auto_send, self.font_size_name, self.language, self.voice_speed, self.output_device)
+        dialog = SettingsDialog(self, self.auto_send, self.font_size_name, self.language, self.voice_speed, self.output_device, self.input_device)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.auto_send = dialog.get_auto_send()
             new_font_size = dialog.get_font_size()
             new_language = dialog.get_language()
             new_voice_speed = dialog.get_voice_speed()
             new_output_device = dialog.get_output_device()
+            new_input_device = dialog.get_input_device()
             
             # Update font size if changed
             if new_font_size != self.font_size_name:
@@ -2073,6 +2165,15 @@ class MainWindow(QMainWindow):
                 self.player.device = new_output_device if new_output_device >= 0 else None
                 print(f"🔈 Audio output device changed to index: {new_output_device}")
 
+            # Update input device (microphone) if changed
+            if new_input_device != self.input_device:
+                self.input_device = new_input_device
+                self.recorder.device = new_input_device if new_input_device >= 0 else None
+                # Reiniciar stream si está activo
+                if self.recorder.stream is not None:
+                    self.recorder.stop_stream()
+                print(f"🎤 Microphone device changed to index: {new_input_device}")
+
             # Save preferences
             self.preferences["auto_send"] = self.auto_send
             self.preferences["font_size"] = self.font_size_name
@@ -2081,6 +2182,7 @@ class MainWindow(QMainWindow):
             self.preferences["english_voice"] = self.english_voice
             self.preferences["spanish_voice"] = self.spanish_voice
             self.preferences["output_device"] = self.output_device
+            self.preferences["input_device"] = self.input_device
             save_preferences(self.preferences)
             
             mode_name = "Auto-send" if self.auto_send else "Manual review"
