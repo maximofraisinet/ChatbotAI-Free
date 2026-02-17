@@ -24,7 +24,7 @@ class TTSManager:
         kokoro_voice: str = "af_bella",
         # Sherpa config (Spanish)
         sherpa_model_dir: str = "voices/spanish",
-        sherpa_voice_name: str = "Daniela",
+        sherpa_voice_name: str = "vits-piper-es_AR-daniela-high",
         sherpa_speaker_id: int = 0,
     ):
         """

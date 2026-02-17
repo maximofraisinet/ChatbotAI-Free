@@ -30,7 +30,7 @@ class AIManager:
                  voice_name="af_bella",
                  language="english",
                  sherpa_model_dir="voices/spanish",
-                 sherpa_voice="Daniela"):
+                 sherpa_voice="vits-piper-es_AR-daniela-high"):
         """
         Initialize all AI models
         
