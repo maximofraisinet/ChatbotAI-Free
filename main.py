@@ -98,7 +98,8 @@ class WorkerThread(QThread):
     status_changed = pyqtSignal(str)
     user_message = pyqtSignal(str)
     bot_message = pyqtSignal(str)
-    bot_message_update = pyqtSignal(str)  # For streaming text updates
+    bot_message_update = pyqtSignal(str)       # For streaming text updates
+    bot_thinking_update = pyqtSignal(str)      # Streaming thinking content
     processing_complete = pyqtSignal()
     speaking_started = pyqtSignal()  # Signal when TTS starts playing
     
@@ -170,6 +171,16 @@ class WorkerThread(QThread):
         full_response = [""]
         bot_bubble_created = [False]
         
+        def on_thinking_chunk(thinking_so_far):
+            """Called for each thinking token - update thinking panel"""
+            if self.interrupted:
+                return
+            # Create bot bubble (empty) the first time thinking arrives
+            if not bot_bubble_created[0]:
+                self.bot_message.emit("")
+                bot_bubble_created[0] = True
+            self.bot_thinking_update.emit(thinking_so_far)
+
         def on_text_chunk(text_so_far):
             """Called for each token - update UI in real-time"""
             if self.interrupted:
@@ -197,7 +208,8 @@ class WorkerThread(QThread):
                 self.ai_manager.get_llm_response_streaming(
                     user_text,
                     on_chunk=on_text_chunk,
-                    on_sentence=on_sentence_ready
+                    on_sentence=on_sentence_ready,
+                    on_thinking=on_thinking_chunk
                 )
             except Exception as e:
                 print(f"LLM streaming error: {e}")
@@ -384,6 +396,102 @@ class MarkdownRenderer:
         return html
 
 
+class ThinkingWidget(QWidget):
+    """Collapsible panel showing the model's thinking/reasoning in streaming mode.
+    Hidden until thinking content arrives.  Collapsed by default."""
+
+    LABEL_COLLAPSED = "✨ Show Reasoning  ▾"
+    LABEL_EXPANDED  = "✨ Hide Reasoning  ▴"
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._expanded = False
+        self._has_content = False
+        self.setStyleSheet("background-color: transparent;")
+        self.setVisible(False)  # hidden until thinking content actually arrives
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 2, 0, 6)
+        layout.setSpacing(4)
+
+        # ── Toggle button ───────────────────────────────────────────────────
+        self.toggle_btn = QPushButton(self.LABEL_COLLAPSED)
+        self.toggle_btn.setFlat(True)
+        self.toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.toggle_btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #9AA0A6;
+                border: none;
+                text-align: left;
+                font-size: 12px;
+                padding: 0px;
+            }
+            QPushButton:hover { color: #8AB4F8; }
+        """)
+        self.toggle_btn.clicked.connect(self.toggle)
+        layout.addWidget(self.toggle_btn)
+
+        # ── Content area ────────────────────────────────────────────────────
+        self.content = QTextBrowser()
+        self.content.setOpenExternalLinks(False)
+        self.content.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.content.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.content.setFrameShape(QFrame.Shape.NoFrame)
+        self.content.setMaximumHeight(220)
+        self.content.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
+        self.content.setStyleSheet("""
+            QTextBrowser {
+                background-color: #1A1B1E;
+                border: 1px solid #3C4043;
+                border-radius: 8px;
+                color: #9AA0A6;
+                font-size: 12px;
+                padding: 8px 10px;
+                font-style: italic;
+                selection-background-color: #3C4043;
+            }
+            QScrollBar:vertical {
+                background: #2A2B2E;
+                width: 6px;
+                border-radius: 3px;
+            }
+            QScrollBar::handle:vertical {
+                background: #5F6368;
+                border-radius: 3px;
+                min-height: 20px;
+            }
+            QScrollBar::add-line:vertical,
+            QScrollBar::sub-line:vertical { height: 0px; }
+        """)
+        self.content.setVisible(False)
+        layout.addWidget(self.content)
+
+    # ── Public API ──────────────────────────────────────────────────────────
+    def update_thinking(self, text: str):
+        """Set accumulated thinking text (call on every streaming update)."""
+        self._has_content = True
+        self.content.setPlainText(text)
+        # Auto-scroll to the bottom while streaming, only when expanded
+        if self._expanded:
+            sb = self.content.verticalScrollBar()
+            sb.setValue(sb.maximum())
+        # Show the widget (button) the first time real content arrives
+        if not self.isVisible():
+            self.setVisible(True)
+
+    def toggle(self):
+        """Expand / collapse the content area."""
+        self._expanded = not self._expanded
+        self.content.setVisible(self._expanded)
+        self.toggle_btn.setText(
+            self.LABEL_EXPANDED if self._expanded else self.LABEL_COLLAPSED
+        )
+        if self._expanded:
+            sb = self.content.verticalScrollBar()
+            sb.setValue(sb.maximum())
+
+
 class UserMessageBubble(QFrame):
     """User message with bubble style - aligned right"""
     
@@ -489,6 +597,10 @@ class BotMessageWidget(QFrame):
         text_layout.setContentsMargins(0, 0, 0, 0)
         text_layout.setSpacing(0)
         
+        # Collapsible thinking panel (hidden until thinking content arrives)
+        self.thinking_widget = ThinkingWidget(text_container)
+        text_layout.addWidget(self.thinking_widget)
+
         # Markdown-rendered text using QTextBrowser
         self.text_browser = QTextBrowser()
         self.text_browser.setObjectName("markdownText")
@@ -599,6 +711,10 @@ class BotMessageWidget(QFrame):
     def get_raw_text(self):
         """Get the raw text (for TTS)"""
         return self._raw_text
+
+    def update_thinking(self, thinking_text: str):
+        """Forward streaming thinking content to the thinking panel."""
+        self.thinking_widget.update_thinking(thinking_text)
 
 
 class ChatBubble(QFrame):
@@ -1947,6 +2063,7 @@ class MainWindow(QMainWindow):
         self.worker_thread.user_message.connect(self.add_user_message)
         self.worker_thread.bot_message.connect(self.add_bot_message)
         self.worker_thread.bot_message_update.connect(self.update_bot_message)
+        self.worker_thread.bot_thinking_update.connect(self.update_bot_thinking)
         self.worker_thread.processing_complete.connect(self.on_processing_complete)
         self.worker_thread.speaking_started.connect(self.on_speaking_started)
         self.worker_thread.start()
@@ -2071,6 +2188,7 @@ class MainWindow(QMainWindow):
         self.worker_thread.user_message.connect(self.add_user_message)
         self.worker_thread.bot_message.connect(self.add_bot_message)
         self.worker_thread.bot_message_update.connect(self.update_bot_message)
+        self.worker_thread.bot_thinking_update.connect(self.update_bot_thinking)
         self.worker_thread.processing_complete.connect(self.on_processing_complete)
         self.worker_thread.speaking_started.connect(self.on_speaking_started)
         self.worker_thread.start()
@@ -2346,6 +2464,16 @@ class MainWindow(QMainWindow):
                 self.scroll_to_bottom()
             except RuntimeError:
                 pass  # Widget was deleted
+
+    @pyqtSlot(str)
+    def update_bot_thinking(self, thinking_text):
+        """Update the thinking panel on the current bot bubble (streaming)."""
+        if hasattr(self, 'current_bot_bubble') and self.current_bot_bubble:
+            try:
+                self.current_bot_bubble.update_thinking(thinking_text)
+                self.scroll_to_bottom()
+            except RuntimeError:
+                pass
     
     def scroll_to_bottom(self):
         """Scroll to bottom of chat only if user is already at the bottom"""

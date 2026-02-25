@@ -271,83 +271,164 @@ class AIManager:
             print(f"LLM error: {e}")
             return "I'm sorry, I couldn't process that request."
     
-    def get_llm_response_streaming(self, user_text, on_chunk=None, on_sentence=None):
+    def get_llm_response_streaming(self, user_text, on_chunk=None, on_sentence=None, on_thinking=None):
         """
-        Get response from Ollama LLM with streaming support
-        
+        Get response from Ollama LLM with streaming support.
+        Handles <think>...</think> blocks: thinking content is routed to on_thinking
+        while the actual response goes to on_chunk / on_sentence.
+
         Args:
             user_text: User's message
-            on_chunk: Callback for each token chunk (full_text_so_far)
-            on_sentence: Callback when a complete sentence is ready (sentence_text)
-            
+            on_chunk: Callback for each token chunk of the final response (text_so_far)
+            on_sentence: Callback when a complete sentence of the final response is ready
+            on_thinking: Callback with accumulated thinking text so far (thinking_so_far)
+
         Returns:
-            Bot's full response text
+            Bot's full response text (excluding thinking block)
         """
         print("Getting LLM response (streaming)...")
-        
+
         try:
             # Add user message to history
             self.conversation_history.append({
                 "role": "user",
                 "content": user_text
             })
-            
+
             # Keep only last 10 messages to save memory
             if len(self.conversation_history) > 10:
                 self.conversation_history = self.conversation_history[-10:]
-            
-            # Stream response from Ollama
-            full_response = ""
+
+            # ── Streaming state ────────────────────────────────────────────────
+            THINK_OPEN  = "<think>"
+            THINK_CLOSE = "</think>"
+            GUARD_OPEN  = len(THINK_OPEN)
+            GUARD_CLOSE = len(THINK_CLOSE)
+
+            in_think         = False
+            buffer           = ""
+            thinking_text    = ""
+            response_text    = ""
             current_sentence = ""
             sentence_delimiters = {'.', '!', '?', '\n'}
-            
-            stream = ollama.chat(
-                model=self.ollama_model,
-                messages=self.conversation_history,
-                stream=True
-            )
-            
-            for chunk in stream:
-                token = chunk['message']['content']
-                full_response += token
-                current_sentence += token
-                
-                # Notify about new text chunk for UI update
+
+            def _emit_response(text_piece):
+                nonlocal response_text, current_sentence
+                if not text_piece:
+                    return
+                response_text    += text_piece
+                current_sentence += text_piece
                 if on_chunk:
-                    on_chunk(full_response)
-                
-                # Check if we have a complete sentence
-                # Look for sentence-ending punctuation followed by space or end
+                    on_chunk(response_text)
                 for delim in sentence_delimiters:
                     if delim in current_sentence:
-                        # Split on delimiter, keeping the delimiter
                         parts = current_sentence.split(delim)
-                        
-                        # Process complete sentences (all but possibly the last part)
-                        for i, part in enumerate(parts[:-1]):
-                            complete_sentence = part.strip() + delim
-                            if complete_sentence.strip() and len(complete_sentence.strip()) > 1:
+                        for part in parts[:-1]:
+                            complete = part.strip() + delim
+                            if complete.strip() and len(complete.strip()) > 1:
                                 if on_sentence:
-                                    on_sentence(complete_sentence)
-                        
-                        # Keep the remainder for the next iteration
+                                    on_sentence(complete)
                         current_sentence = parts[-1]
                         break
-            
-            # Handle any remaining text as final sentence
+
+            def _emit_thinking(text_piece):
+                nonlocal thinking_text
+                if not text_piece:
+                    return
+                thinking_text += text_piece
+                if on_thinking:
+                    on_thinking(thinking_text)
+
+            def _process_stream(use_think: bool):
+                """Run the stream loop. Returns True on success, raises on real errors."""
+                stream = ollama.chat(
+                    model=self.ollama_model,
+                    messages=self.conversation_history,
+                    stream=True,
+                    **({"think": True} if use_think else {}),
+                )
+                for chunk in stream:
+                    msg = chunk['message']
+
+                    # Path 1: Ollama native thinking field
+                    native_thinking = msg.get('thinking') or ''
+                    if native_thinking:
+                        _emit_thinking(native_thinking)
+
+                    # Path 2: Content (may contain <think> tags as fallback)
+                    content_piece = msg.get('content') or ''
+                    if not content_piece:
+                        continue
+
+                    nonlocal buffer, in_think
+                    buffer += content_piece
+
+                    while True:
+                        if not in_think:
+                            tag_pos = buffer.find(THINK_OPEN)
+                            if tag_pos == -1:
+                                safe_end = max(0, len(buffer) - GUARD_OPEN)
+                                if safe_end > 0:
+                                    _emit_response(buffer[:safe_end])
+                                    buffer = buffer[safe_end:]
+                                break
+                            else:
+                                _emit_response(buffer[:tag_pos])
+                                buffer = buffer[tag_pos + GUARD_OPEN:]
+                                in_think = True
+                                print("🧠 Thinking block started (<think> tag)")
+                        else:
+                            tag_pos = buffer.find(THINK_CLOSE)
+                            if tag_pos == -1:
+                                safe_end = max(0, len(buffer) - GUARD_CLOSE)
+                                if safe_end > 0:
+                                    _emit_thinking(buffer[:safe_end])
+                                    buffer = buffer[safe_end:]
+                                break
+                            else:
+                                _emit_thinking(buffer[:tag_pos])
+                                buffer = buffer[tag_pos + GUARD_CLOSE:]
+                                in_think = False
+                                print("🧠 Thinking block ended")
+
+            # Try with thinking; if the model rejects it, retry without
+            try:
+                _process_stream(use_think=True)
+            except Exception as think_err:
+                err_str = str(think_err).lower()
+                if '400' in err_str or 'thinking' in err_str or 'does not support' in err_str:
+                    print(f"Model does not support thinking, retrying without: {think_err}")
+                    # Reset state for clean retry
+                    buffer = ""
+                    in_think = False
+                    thinking_text = ""
+                    response_text = ""
+                    current_sentence = ""
+                    _process_stream(use_think=False)
+                else:
+                    raise
+
+            # ── Flush remaining buffer ─────────────────────────────────────────
+            if buffer:
+                if in_think:
+                    _emit_thinking(buffer)
+                else:
+                    _emit_response(buffer)
+
+            # Emit any remaining partial sentence
             if current_sentence.strip():
                 if on_sentence:
                     on_sentence(current_sentence.strip())
-            
-            # Add bot response to history
+
+            # Save only the response (not the thinking) to conversation history
             self.conversation_history.append({
                 "role": "assistant",
-                "content": full_response
+                "content": response_text
             })
-            
-            print(f"Bot response complete: {full_response[:100]}...")
-            return full_response
-            
+
+            print(f"Bot response complete: {response_text[:100]}...")
+            return response_text
+
         except Exception as e:
             print(f"LLM error: {e}")
             return "I'm sorry, I couldn't process that request."
