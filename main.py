@@ -338,7 +338,30 @@ class MarkdownRenderer:
                        font-size: {font_size - 1}px; overflow-x: auto; white-space: pre-wrap;">
                        <code>{code}</code></div>'''
         text = re.sub(r'```(\w*)\n?(.*?)```', code_block_replace, text, flags=re.DOTALL)
-        
+
+        # Markdown tables  (must run before newline conversion)
+        def table_replace(match):
+            lines = [l for l in match.group(0).split('\n') if l.strip()]
+            if len(lines) < 3:
+                return match.group(0)
+            headers = [h.strip() for h in lines[0].strip('|').split('|')]
+            rows = []
+            for line in lines[2:]:
+                cells = [c.strip() for c in line.strip('|').split('|')]
+                rows.append(cells)
+            th_html = ''.join(f'<th>{h}</th>' for h in headers)
+            tr_html = ''.join(
+                f'<tr class="{"tr-even" if i % 2 == 0 else "tr-odd"}">'
+                + ''.join(f'<td>{c}</td>' for c in row)
+                + '</tr>'
+                for i, row in enumerate(rows)
+            )
+            return f'<table><thead><tr>{th_html}</tr></thead><tbody>{tr_html}</tbody></table>\n'
+        text = re.sub(
+            r'(?m)^\|[^\n]+\|\s*\n\|[-|: \t]+\|\s*\n(?:\|[^\n]+\|\s*\n?)+',
+            table_replace, text
+        )
+
         # Inline code (`code`)
         text = re.sub(r'`([^`]+)`', 
                      rf'<code style="background-color: #282A2C; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: {font_size - 1}px;">\1</code>', 
@@ -392,8 +415,17 @@ class MarkdownRenderer:
         
         # Wrap in paragraph (with minimal margin)
         html = f'''<div style="margin: 0; line-height: 1.6;">{text}</div>'''
-        
+
         return html
+
+    @staticmethod
+    def extract_tables(text):
+        """Return list of raw markdown table strings found in text."""
+        import re
+        return re.findall(
+            r'(?m)^\|[^\n]+\|\s*\n\|[-|: \t]+\|\s*\n(?:\|[^\n]+\|\s*\n?)+',
+            text
+        )
 
 
 class ThinkingWidget(QWidget):
@@ -596,7 +628,6 @@ class BotMessageWidget(QFrame):
         text_layout = QVBoxLayout(text_container)
         text_layout.setContentsMargins(0, 0, 0, 0)
         text_layout.setSpacing(0)
-        
         # Collapsible thinking panel (hidden until thinking content arrives)
         self.thinking_widget = ThinkingWidget(text_container)
         text_layout.addWidget(self.thinking_widget)
@@ -679,6 +710,32 @@ class BotMessageWidget(QFrame):
                 p {{
                     margin: 4px 0;
                 }}
+                table {{
+                    border-collapse: collapse;
+                    width: 100%;
+                    margin: 10px 0;
+                }}
+                th {{
+                    background-color: #303136;
+                    color: #FFFFFF;
+                    padding: 8px 14px;
+                    text-align: left;
+                    font-weight: 600;
+                    border: 1px solid #5C6166;
+                    font-size: {self.font_size}px;
+                }}
+                td {{
+                    padding: 6px 14px;
+                    border: 1px solid #3C4043;
+                    color: #E3E3E3;
+                    font-size: {self.font_size}px;
+                }}
+                tr.tr-even td {{
+                    background-color: #26272B;
+                }}
+                tr.tr-odd td {{
+                    background-color: #1E1F20;
+                }}
             </style>
         </head>
         <body>{html_content}</body>
@@ -686,12 +743,12 @@ class BotMessageWidget(QFrame):
         '''
         
         self.text_browser.setHtml(full_html)
-        
+
         # Adjust height to content
         self.text_browser.document().setTextWidth(self.text_browser.viewport().width())
         doc_height = self.text_browser.document().size().height()
         self.text_browser.setMinimumHeight(int(doc_height) + 10)
-    
+
     def update_font_size(self, font_size):
         """Update the font size"""
         self.font_size = font_size
