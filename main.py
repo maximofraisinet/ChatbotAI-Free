@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (
     QTextBrowser, QSlider
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, pyqtSlot, QTimer, QPropertyAnimation, QEasingCurve, QRect
-from PyQt6.QtGui import QFont, QColor
+from PyQt6.QtGui import QFont, QColor, QPainter, QPen
 
 from styles import GEMINI_STYLE, COLORS
 from audio_utils import AudioRecorder, AudioPlayer
@@ -102,6 +102,7 @@ class WorkerThread(QThread):
     bot_thinking_update = pyqtSignal(str)      # Streaming thinking content
     processing_complete = pyqtSignal()
     speaking_started = pyqtSignal()  # Signal when TTS starts playing
+    context_usage_updated = pyqtSignal(int, int)  # (used_tokens, model_ctx_size)
     
     def __init__(self, ai_manager, audio_player, voice_speed=1.0):
         super().__init__()
@@ -270,6 +271,10 @@ class WorkerThread(QThread):
         tts_thread.join(timeout=1.0)
         
         self.status_changed.emit("Ready")
+        # Emit context usage for the donut indicator
+        usage = self.ai_manager.last_token_usage
+        ctx_size = self.ai_manager.get_model_context_size()
+        self.context_usage_updated.emit(usage.get('total', 0), ctx_size)
         self.processing_complete.emit()
     
     def _clean_markdown(self, text):
@@ -566,6 +571,176 @@ class UserMessageBubble(QFrame):
                 border: none;
             }}
         """)
+
+
+class ContextPopup(QFrame):
+    """Floating popup card shown when the user clicks the ContextDonut."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent, Qt.WindowType.Popup)
+        self.setObjectName("contextPopup")
+        self.setStyleSheet("""
+            QFrame#contextPopup {
+                background-color: #202124;
+                border: 1px solid #5C6166;
+                border-radius: 10px;
+            }
+        """)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 14, 16, 14)
+        layout.setSpacing(6)
+
+        self._title = QLabel("Context Window")
+        self._title.setStyleSheet(
+            "font-size:14px;font-weight:700;color:#E3E3E3;background:transparent;border:none;"
+        )
+        layout.addWidget(self._title)
+
+        self._desc = QLabel(
+            "The model can only see the last N tokens of your\n"
+            "conversation. Once full, older messages are dropped."
+        )
+        self._desc.setStyleSheet(
+            "font-size:11px;color:#9AA0A6;background:transparent;border:none;"
+        )
+        self._desc.setWordWrap(True)
+        layout.addWidget(self._desc)
+
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet("background:#3C4043;border:none;max-height:1px;")
+        layout.addWidget(sep)
+
+        self._usage_label = QLabel("No data yet")
+        self._usage_label.setStyleSheet(
+            "font-size:13px;font-weight:600;color:#9AA0A6;background:transparent;border:none;"
+        )
+        layout.addWidget(self._usage_label)
+
+        self._hint = QLabel("Send a message to start tracking.")
+        self._hint.setStyleSheet(
+            "font-size:11px;color:#9AA0A6;background:transparent;border:none;"
+        )
+        self._hint.setWordWrap(True)
+        layout.addWidget(self._hint)
+
+        self.setFixedWidth(280)
+
+    @staticmethod
+    def _fmt_k(n: int) -> str:
+        return f"{n / 1000:.1f}K" if n >= 1000 else str(n)
+
+    def refresh(self, used: int, total: int):
+        pct = int(min(used / max(total, 1), 1.0) * 100)
+        u_str = self._fmt_k(used)
+        t_str = self._fmt_k(total) if total > 0 else "—"
+
+        if total == 0:
+            hint = "Send a message to start tracking."
+            color = "#9AA0A6"
+            usage_text = "No data yet"
+        elif pct < 50:
+            hint = f"You're well within limits — {100 - pct}% still available."
+            color = "#34A853"
+            usage_text = f"{u_str} / {t_str} tokens  ({pct}%)"
+        elif pct < 80:
+            hint = f"{100 - pct}% remaining. Consider starting a new chat soon."
+            color = "#FBBC04"
+            usage_text = f"{u_str} / {t_str} tokens  ({pct}%)"
+        else:
+            hint = "Almost full! Start a new chat to avoid losing early context."
+            color = "#EA4335"
+            usage_text = f"{u_str} / {t_str} tokens  ({pct}%)"
+
+        self._usage_label.setText(usage_text)
+        self._usage_label.setStyleSheet(
+            f"font-size:13px;font-weight:600;color:{color};background:transparent;border:none;"
+        )
+        self._hint.setText(hint)
+        self.adjustSize()
+
+
+class ContextDonut(QWidget):
+    """Small circular indicator showing context-window usage as a filled arc."""
+    _SIZE = 40
+    _THICK = 6
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(self._SIZE, self._SIZE)
+        self._used = 0
+        self._total = 0
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setToolTip("Click to see context window details")
+        self._popup = ContextPopup()
+
+    @staticmethod
+    def _fmt_k(n: int) -> str:
+        return f"{n / 1000:.1f}K" if n >= 1000 else str(n)
+
+    def update_usage(self, used: int, total: int):
+        self._used = used
+        self._total = max(total, 1)
+        self._popup.refresh(used, total)
+        self.update()
+
+    def mousePressEvent(self, event):
+        if self._popup.isVisible():
+            self._popup.hide()
+            return
+        self._popup.refresh(self._used, self._total)
+        # Position popup above the donut, right-aligned
+        global_pos = self.mapToGlobal(self.rect().topRight())
+        popup_x = global_pos.x() - self._popup.sizeHint().width()
+        popup_y = global_pos.y() - self._popup.sizeHint().height() - 8
+        self._popup.move(popup_x, popup_y)
+        self._popup.show()
+        super().mousePressEvent(event)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        m = self._THICK + 3
+        from PyQt6.QtCore import QRect
+        rect = QRect(m, m, self._SIZE - 2 * m, self._SIZE - 2 * m)
+
+        ratio = min(self._used / max(self._total, 1), 1.0)
+
+        # Background full circle
+        bg_pen = QPen(QColor('#3C4043'))
+        bg_pen.setWidth(self._THICK)
+        bg_pen.setCapStyle(Qt.PenCapStyle.FlatCap)
+        painter.setPen(bg_pen)
+        painter.drawArc(rect, 0, 360 * 16)
+
+        # Colored arc proportional to usage
+        if ratio > 0:
+            if ratio < 0.5:
+                arc_color = QColor('#34A853')   # green
+            elif ratio < 0.80:
+                arc_color = QColor('#FBBC04')   # yellow
+            else:
+                arc_color = QColor('#EA4335')   # red
+            arc_pen = QPen(arc_color)
+            arc_pen.setWidth(self._THICK)
+            arc_pen.setCapStyle(Qt.PenCapStyle.FlatCap)
+            painter.setPen(arc_pen)
+            # Qt: 90*16 = top, negative span = clockwise
+            painter.drawArc(rect, 90 * 16, -int(ratio * 360 * 16))
+
+        # Center percentage text
+        text = f"{int(ratio * 100)}%" if self._total > 0 else "?"
+        from PyQt6.QtGui import QFont as _QFont
+        f = _QFont()
+        f.setPixelSize(9)
+        f.setBold(True)
+        painter.setFont(f)
+        painter.setPen(QPen(QColor('#9AA0A6')))
+        painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, text)
+        painter.end()
 
 
 class CustomTextEdit(QTextEdit):
@@ -2003,7 +2178,11 @@ class MainWindow(QMainWindow):
         self.status_label.setObjectName("statusLabel")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         button_row.addWidget(self.status_label, 1)
-        
+
+        # Context window usage indicator
+        self.context_donut = ContextDonut()
+        button_row.addWidget(self.context_donut)
+
         # MIC BUTTON (center-right) - Main voice button
         self.mic_btn = QPushButton("🎤")
         self.mic_btn.setObjectName("micButton")
@@ -2121,6 +2300,7 @@ class MainWindow(QMainWindow):
         self.worker_thread.bot_message.connect(self.add_bot_message)
         self.worker_thread.bot_message_update.connect(self.update_bot_message)
         self.worker_thread.bot_thinking_update.connect(self.update_bot_thinking)
+        self.worker_thread.context_usage_updated.connect(self.update_context_donut)
         self.worker_thread.processing_complete.connect(self.on_processing_complete)
         self.worker_thread.speaking_started.connect(self.on_speaking_started)
         self.worker_thread.start()
@@ -2246,6 +2426,7 @@ class MainWindow(QMainWindow):
         self.worker_thread.bot_message.connect(self.add_bot_message)
         self.worker_thread.bot_message_update.connect(self.update_bot_message)
         self.worker_thread.bot_thinking_update.connect(self.update_bot_thinking)
+        self.worker_thread.context_usage_updated.connect(self.update_context_donut)
         self.worker_thread.processing_complete.connect(self.on_processing_complete)
         self.worker_thread.speaking_started.connect(self.on_speaking_started)
         self.worker_thread.start()
@@ -2523,6 +2704,11 @@ class MainWindow(QMainWindow):
                 pass  # Widget was deleted
 
     @pyqtSlot(str)
+    @pyqtSlot(int, int)
+    def update_context_donut(self, used: int, total: int):
+        """Update the context-window donut indicator."""
+        self.context_donut.update_usage(used, total)
+
     def update_bot_thinking(self, thinking_text):
         """Update the thinking panel on the current bot bubble (streaming)."""
         if hasattr(self, 'current_bot_bubble') and self.current_bot_bubble:

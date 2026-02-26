@@ -108,6 +108,8 @@ class AIManager:
         
         # Conversation history for context
         self.conversation_history = []
+        # Token usage from last LLM response (updated after each stream)
+        self.last_token_usage = {"prompt": 0, "completion": 0, "total": 0}
         
         print("\n🎉 AI Manager initialized successfully!")
         print(f"   Language: {language}")
@@ -348,6 +350,15 @@ class AIManager:
                     **({"think": True} if use_think else {}),
                 )
                 for chunk in stream:
+                    # Capture token stats from the final 'done' chunk
+                    if chunk.get('done'):
+                        p = chunk.get('prompt_eval_count') or 0
+                        c = chunk.get('eval_count') or 0
+                        self.last_token_usage = {
+                            "prompt": p,
+                            "completion": c,
+                            "total": p + c,
+                        }
                     msg = chunk['message']
 
                     # Path 1: Ollama native thinking field
@@ -477,6 +488,33 @@ class AIManager:
             # Return silence as fallback
             return np.zeros(24000, dtype=np.float32), 24000
     
+    def get_model_context_size(self):
+        """Return the context-window size (num_ctx) of the current model."""
+        if hasattr(self, '_ctx_cache') and self._ctx_cache[0] == self.ollama_model:
+            return self._ctx_cache[1]
+        try:
+            info = ollama.show(self.ollama_model)
+            size = 4096  # sensible default
+            model_info = getattr(info, 'model_info', None) or {}
+            found = False
+            for key, val in model_info.items():
+                if 'context_length' in key.lower():
+                    size = int(val)
+                    found = True
+                    break
+            if not found:
+                import re as _re
+                modelfile = getattr(info, 'modelfile', '') or ''
+                m = _re.search(r'PARAMETER\s+num_ctx\s+(\d+)', modelfile, _re.IGNORECASE)
+                if m:
+                    size = int(m.group(1))
+            self._ctx_cache = (self.ollama_model, size)
+            print(f"Model context size for {self.ollama_model}: {size} tokens")
+            return size
+        except Exception as e:
+            print(f"Could not query model context size: {e}")
+            return 4096
+
     def reset_conversation(self):
         """Clear conversation history"""
         self.conversation_history = []

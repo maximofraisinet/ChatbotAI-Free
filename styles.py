@@ -402,6 +402,17 @@ QPushButton#liveStartButton:hover {
 QPushButton#liveStartButton:pressed {
     background-color: #3C4043;
 }
+
+/* ===== TOOLTIP ===== */
+QToolTip {
+    background-color: #202124;
+    color: #E3E3E3;
+    border: 1px solid #5C6166;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-family: 'Google Sans', 'Segoe UI', Arial, sans-serif;
+}
 """
 
 # For backwards compatibility
