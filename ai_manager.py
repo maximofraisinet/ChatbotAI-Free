@@ -44,6 +44,7 @@ class AIManager:
         
         self.language = language
         self.current_voice = voice_name
+        self.num_ctx = 0  # 0 = use model default
         
         # Check CUDA availability
         try:
@@ -109,6 +110,12 @@ class AIManager:
         print(f"   Language: {language}")
         print("Ready to chat!\n")
     
+    def _ollama_options(self):
+        """Build the options dict for ollama.chat, including num_ctx if set."""
+        if self.num_ctx and self.num_ctx > 0:
+            return {"num_ctx": self.num_ctx}
+        return {}
+
     def transcribe(self, audio_data, sample_rate=16000):
         """
         Transcribe audio to text using Whisper
@@ -237,14 +244,11 @@ class AIManager:
                 "content": user_text
             })
             
-            # Keep only last 10 messages to save memory
-            if len(self.conversation_history) > 10:
-                self.conversation_history = self.conversation_history[-10:]
-            
             # Get response from Ollama
             response = ollama.chat(
                 model=self.ollama_model,
-                messages=self.conversation_history
+                messages=self.conversation_history,
+                options=self._ollama_options(),
             )
             
             bot_response = response['message']['content']
@@ -285,10 +289,6 @@ class AIManager:
                 "role": "user",
                 "content": user_text
             })
-
-            # Keep only last 10 messages to save memory
-            if len(self.conversation_history) > 10:
-                self.conversation_history = self.conversation_history[-10:]
 
             # ── Streaming state ────────────────────────────────────────────────
             THINK_OPEN  = "<think>"
@@ -336,6 +336,7 @@ class AIManager:
                     model=self.ollama_model,
                     messages=self.conversation_history,
                     stream=True,
+                    options=self._ollama_options(),
                     **({"think": True} if use_think else {}),
                 )
                 for chunk in stream:
@@ -477,7 +478,16 @@ class AIManager:
             return np.zeros(24000, dtype=np.float32), 24000
     
     def get_model_context_size(self):
-        """Return the context-window size (num_ctx) of the current model."""
+        """Return the effective context-window size.
+
+        If the user configured a custom num_ctx, that value is used (it
+        overrides the model default at the Ollama level).  Otherwise, we
+        query the model metadata for its built-in context_length.
+        """
+        # User override takes priority
+        if self.num_ctx and self.num_ctx > 0:
+            return self.num_ctx
+
         if hasattr(self, '_ctx_cache') and self._ctx_cache[0] == self.ollama_model:
             return self._ctx_cache[1]
         try:

@@ -12,7 +12,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout, QLabel, QScrollArea, QPushButton,
     QComboBox, QFrame, QSpacerItem, QSizePolicy, QTextEdit,
     QDialog, QCheckBox, QStackedWidget, QGraphicsDropShadowEffect,
-    QTextBrowser, QSlider, QRadioButton, QButtonGroup
+    QTextBrowser, QSlider, QRadioButton, QButtonGroup, QSpinBox
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, pyqtSlot, QTimer, QPropertyAnimation, QEasingCurve, QRect
 from PyQt6.QtGui import QFont, QColor, QPainter, QPen
@@ -1520,7 +1520,7 @@ class LiveModeWidget(QWidget):
 class SettingsDialog(QDialog):
     """Settings dialog with font size and language options"""
     
-    def __init__(self, parent=None, auto_send=True, font_size="medium", language="english", voice_speed=1.0, output_device=-1, input_device=-1):
+    def __init__(self, parent=None, auto_send=True, font_size="medium", language="english", voice_speed=1.0, output_device=-1, input_device=-1, context_size=0):
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.setMinimumWidth(440)
@@ -1531,6 +1531,7 @@ class SettingsDialog(QDialog):
         self.voice_speed = voice_speed
         self.output_device = output_device
         self.input_device = input_device
+        self.context_size = context_size
 
         # Outer layout: scroll area (contenido) + botón guardar (fijo abajo)
         from PyQt6.QtWidgets import QScrollArea
@@ -1864,7 +1865,64 @@ class SettingsDialog(QDialog):
         help_text.setWordWrap(True)
         help_text.setStyleSheet("font-size: 11px; color: #9AA0A6; margin-left: 26px;")
         layout.addWidget(help_text)
-        
+
+        # Separator context
+        sep_ctx = QFrame()
+        sep_ctx.setFrameShape(QFrame.Shape.HLine)
+        sep_ctx.setStyleSheet("background-color: #3C4043;")
+        layout.addWidget(sep_ctx)
+
+        # ===== CONTEXT WINDOW SIZE =====
+        ctx_label = QLabel("\U0001F9E0 Context Window Size:")
+        ctx_label.setStyleSheet("font-size: 14px; color: #E3E3E3; margin-top: 10px;")
+        layout.addWidget(ctx_label)
+
+        self.context_spin = QSpinBox()
+        self.context_spin.setMinimum(0)
+        self.context_spin.setMaximum(131072)
+        self.context_spin.setSingleStep(1024)
+        self.context_spin.setValue(context_size)
+        self.context_spin.setSpecialValueText("Model default")
+        self.context_spin.setSuffix(" tokens")
+        self.context_spin.setStyleSheet("""
+            QSpinBox {
+                background-color: #282A2C;
+                color: #E3E3E3;
+                border: 1px solid #3C4043;
+                border-radius: 8px;
+                padding: 8px 16px;
+                font-size: 13px;
+                min-width: 180px;
+            }
+            QSpinBox:hover { background-color: #3C4043; }
+            QSpinBox::up-button, QSpinBox::down-button {
+                background-color: transparent;
+                border: none;
+                width: 20px;
+            }
+            QSpinBox::up-arrow {
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-bottom: 5px solid #9AA0A6;
+                width: 0px; height: 0px;
+            }
+            QSpinBox::down-arrow {
+                border-left: 4px solid transparent;
+                border-right: 4px solid transparent;
+                border-top: 5px solid #9AA0A6;
+                width: 0px; height: 0px;
+            }
+        """)
+        layout.addWidget(self.context_spin)
+
+        ctx_help = QLabel(
+            "Set to 0 for model default. Higher values allow longer conversations "
+            "but use more VRAM. Common values: 4096, 8192, 16384, 32768, 65536, 131072."
+        )
+        ctx_help.setWordWrap(True)
+        ctx_help.setStyleSheet("font-size: 11px; color: #9AA0A6; margin-left: 4px;")
+        layout.addWidget(ctx_help)
+
         layout.addStretch()
 
         # Close button fijo fuera del scroll
@@ -1917,6 +1975,9 @@ class SettingsDialog(QDialog):
 
     def get_input_device(self):
         return self._mic_indices[self.mic_combo.currentIndex()]
+
+    def get_context_size(self):
+        return self.context_spin.value()
 
 
 class VoiceSetupDialog(QDialog):
@@ -2232,6 +2293,7 @@ class MainWindow(QMainWindow):
         self.font_size_name = self.preferences.get("font_size", "medium")
         self.language = self.preferences.get("language", "english")
         self.voice_speed = self.preferences.get("voice_speed", 1.0)
+        self.context_size = self.preferences.get("context_size", 0)
         self.chat_bubbles = []  # Track bubbles for font size updates
         
         # Voice preferences
@@ -2259,6 +2321,8 @@ class MainWindow(QMainWindow):
                 language=self.language,
                 voice_name=current_voice,
             )
+            if self.context_size > 0:
+                self.ai_manager.num_ctx = self.context_size
         except Exception as e:
             print(f"Error initializing AI: {e}")
             self.ai_manager = None
@@ -2773,7 +2837,7 @@ class MainWindow(QMainWindow):
     
     def open_settings(self):
         """Open settings dialog"""
-        dialog = SettingsDialog(self, self.auto_send, self.font_size_name, self.language, self.voice_speed, self.output_device, self.input_device)
+        dialog = SettingsDialog(self, self.auto_send, self.font_size_name, self.language, self.voice_speed, self.output_device, self.input_device, self.context_size)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.auto_send = dialog.get_auto_send()
             new_font_size = dialog.get_font_size()
@@ -2825,6 +2889,15 @@ class MainWindow(QMainWindow):
                     self.recorder.stop_stream()
                 print(f"🎤 Microphone device changed to index: {new_input_device}")
 
+            # Update context window size
+            new_context_size = dialog.get_context_size()
+            if new_context_size != self.context_size:
+                self.context_size = new_context_size
+                if self.ai_manager:
+                    self.ai_manager.num_ctx = new_context_size
+                ctx_display = f"{new_context_size} tokens" if new_context_size > 0 else "model default"
+                print(f"🧠 Context window size changed to: {ctx_display}")
+
             # Save preferences
             self.preferences["auto_send"] = self.auto_send
             self.preferences["font_size"] = self.font_size_name
@@ -2834,6 +2907,7 @@ class MainWindow(QMainWindow):
             self.preferences["spanish_voice"] = self.spanish_voice
             self.preferences["output_device"] = self.output_device
             self.preferences["input_device"] = self.input_device
+            self.preferences["context_size"] = self.context_size
             save_preferences(self.preferences)
             
             mode_name = "Auto-send" if self.auto_send else "Manual review"

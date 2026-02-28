@@ -35,6 +35,7 @@ DEFAULT_PREFERENCES = {
     "spanish_voice": "ef_dora",  # Spanish voice preference (Kokoro)
     "output_device": -1,  # Audio output device index (-1 = system default)
     "input_device": -1,  # Audio input device index (-1 = system default)
+    "context_size": 0,  # LLM context window in tokens (0 = model default)
 }
 
 FONT_SIZES = {
