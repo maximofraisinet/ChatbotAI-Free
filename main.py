@@ -1518,6 +1518,585 @@ class LiveModeWidget(QWidget):
         self.exit_requested.emit()
 
 
+# ═══════════════════════════════════════════════════════════════════════
+# Shadowing / Reading Practice Mode
+# ═══════════════════════════════════════════════════════════════════════
+
+class PracticeWorkerThread(QThread):
+    """Background thread that continuously records, transcribes, and diffs
+    the user's speech against a reference text."""
+
+    progress_html = pyqtSignal(str)   # coloured HTML to display
+    status_changed = pyqtSignal(str)  # "listening", "transcribing", "paused", "stopped"
+    finished_signal = pyqtSignal()
+
+    # Colours
+    _GREEN = "#34A853"
+    _RED   = "#EA4335"
+    _GREY  = "#E3E3E3"
+
+    def __init__(self, ai_manager, recorder, reference_words: list[str]):
+        super().__init__()
+        self.ai_manager = ai_manager
+        self.recorder = recorder
+        self.reference_words = reference_words    # cleaned lowercase words
+        self.reference_display = []               # original-case words (set later)
+        self._running = False
+        self._paused = False
+        self._spoken_so_far = ""   # cumulative transcription
+        self.last_word_status: list[str | None] = []  # final status per word
+
+    # ── public control ────────────────────────────────────────────────
+    def pause(self):
+        self._paused = True
+        self.recorder.pause_recording()
+        self.status_changed.emit("paused")
+
+    def resume(self):
+        self._paused = False
+        self.recorder.resume_recording()
+        self.status_changed.emit("listening")
+
+    def stop(self):
+        self._running = False
+        self._paused = False
+
+    # ── main loop ─────────────────────────────────────────────────────
+    def run(self):
+        import difflib, re
+        self._running = True
+        self.recorder.start_stream()
+        self.status_changed.emit("listening")
+
+        while self._running:
+            if self._paused:
+                QThread.msleep(200)
+                continue
+
+            # Record a short utterance (VAD-based)
+            audio = self.recorder.record_until_silence(max_duration=15)
+            if audio is None or len(audio) == 0 or not self._running:
+                continue
+
+            min_samples = int(self.recorder.sample_rate * self.recorder.min_audio_duration)
+            if len(audio) < min_samples:
+                continue
+
+            self.status_changed.emit("transcribing")
+            text = self.ai_manager.transcribe(audio)
+            if not text or not self._running:
+                if self._running:
+                    self.status_changed.emit("listening")
+                continue
+
+            self._spoken_so_far += " " + text
+            spoken_words = re.findall(r"[a-záéíóúüñ']+", self._spoken_so_far.lower())
+
+            # Diff spoken vs reference
+            matcher = difflib.SequenceMatcher(None, self.reference_words, spoken_words)
+            word_status: list[str | None] = [None] * len(self.reference_words)
+
+            for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+                if tag == "equal":
+                    for k in range(i1, i2):
+                        word_status[k] = "correct"
+                elif tag == "replace":
+                    for k in range(i1, i2):
+                        word_status[k] = "wrong"
+                elif tag == "delete":
+                    # Words in reference not spoken yet – mark wrong only up
+                    # to the furthest spoken position
+                    furthest = max((i2 for _, _, i2, _, _ in matcher.get_opcodes() if i2 <= len(self.reference_words)), default=0)
+                    for k in range(i1, min(i2, furthest)):
+                        word_status[k] = "wrong"
+
+            self.last_word_status = word_status
+
+            # Build HTML
+            html_parts: list[str] = []
+            for idx, display_word in enumerate(self.reference_display):
+                st = word_status[idx] if idx < len(word_status) else None
+                if st == "correct":
+                    c = self._GREEN
+                elif st == "wrong":
+                    c = self._RED
+                else:
+                    c = self._GREY
+                clean = re.sub(r"[^\w']", "", display_word.lower())
+                html_parts.append(
+                    f'<a href="{clean}" style="text-decoration:none;color:{c};'
+                    f'font-size:22px;">{display_word}</a>'
+                )
+
+            self.progress_html.emit("&nbsp; ".join(html_parts))
+            if self._running:
+                self.status_changed.emit("listening")
+
+        self.recorder.stop_stream()
+        self.status_changed.emit("stopped")
+        self.finished_signal.emit()
+
+
+class PracticeFeedbackDialog(QDialog):
+    """Modal results dialog shown after a reading-practice session."""
+
+    def __init__(self, reference_display: list[str],
+                 word_status: list[str | None], parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Practice Results")
+        self.setMinimumWidth(520)
+        self.setStyleSheet("""
+            QDialog { background-color: #202124; }
+            QLabel  { background-color: transparent; }
+        """)
+
+        total = len(reference_display)
+        correct = sum(1 for s in word_status if s == "correct")
+        wrong   = sum(1 for s in word_status if s == "wrong")
+        skipped = total - correct - wrong
+        pct = (correct / total * 100) if total else 0
+
+        # Letter grade
+        if pct >= 95:
+            grade, grade_color, grade_msg = "A+", "#34A853", "Outstanding! Near-perfect reading."
+        elif pct >= 90:
+            grade, grade_color, grade_msg = "A", "#34A853", "Excellent work! Very accurate reading."
+        elif pct >= 80:
+            grade, grade_color, grade_msg = "B", "#8AB4F8", "Great job! A few words to polish."
+        elif pct >= 70:
+            grade, grade_color, grade_msg = "C", "#F4B400", "Good effort. Keep practising!"
+        elif pct >= 50:
+            grade, grade_color, grade_msg = "D", "#E37400", "Getting there. Try reading slower."
+        else:
+            grade, grade_color, grade_msg = "F", "#EA4335", "Needs more practice. Don\u2019t give up!"
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(30, 26, 30, 22)
+        lay.setSpacing(16)
+
+        # ── Grade circle ──────────────────────────────────────────────
+        grade_label = QLabel(grade)
+        grade_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        grade_label.setFixedSize(90, 90)
+        grade_label.setStyleSheet(
+            f"font-size: 42px; font-weight: bold; color: {grade_color}; "
+            f"border: 3px solid {grade_color}; border-radius: 45px;"
+        )
+        lay.addWidget(grade_label, 0, Qt.AlignmentFlag.AlignCenter)
+
+        msg = QLabel(grade_msg)
+        msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        msg.setStyleSheet(f"font-size: 15px; color: {grade_color}; font-weight: bold;")
+        lay.addWidget(msg)
+
+        # ── Accuracy bar ──────────────────────────────────────────────
+        pct_label = QLabel(f"{pct:.0f}% Accuracy")
+        pct_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        pct_label.setStyleSheet("font-size: 22px; font-weight: bold; color: #E3E3E3;")
+        lay.addWidget(pct_label)
+
+        # Visual progress bar
+        bar_bg = QWidget()
+        bar_bg.setFixedHeight(10)
+        bar_bg.setStyleSheet("background-color: #3C4043; border-radius: 5px;")
+        bar_fill = QWidget(bar_bg)
+        fill_w = max(int(pct / 100 * 460), 0)
+        bar_fill.setGeometry(0, 0, fill_w, 10)
+        bar_fill.setStyleSheet(
+            f"background-color: {grade_color}; border-radius: 5px;"
+        )
+        lay.addWidget(bar_bg)
+
+        # ── Stats card ────────────────────────────────────────────────
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet("background-color: #3C4043;")
+        lay.addWidget(sep)
+
+        stats = QWidget()
+        stats.setStyleSheet(
+            "background-color: #282A2C; border-radius: 12px;"
+        )
+        sl = QHBoxLayout(stats)
+        sl.setContentsMargins(20, 16, 20, 16)
+        sl.setSpacing(0)
+
+        def _stat_col(value: str, label: str, color: str):
+            col = QVBoxLayout()
+            col.setSpacing(2)
+            v = QLabel(value)
+            v.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            v.setStyleSheet(f"font-size: 24px; font-weight: bold; color: {color};")
+            l = QLabel(label)
+            l.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            l.setStyleSheet("font-size: 11px; color: #9AA0A6;")
+            col.addWidget(v)
+            col.addWidget(l)
+            return col
+
+        sl.addLayout(_stat_col(str(total), "Total Words", "#E3E3E3"))
+        sl.addLayout(_stat_col(str(correct), "Correct", "#34A853"))
+        sl.addLayout(_stat_col(str(wrong), "Incorrect", "#EA4335"))
+        sl.addLayout(_stat_col(str(skipped), "Not Read", "#9AA0A6"))
+        lay.addWidget(stats)
+
+        # ── Missed words list ─────────────────────────────────────────
+        missed = [
+            reference_display[i]
+            for i, s in enumerate(word_status)
+            if s == "wrong"
+        ]
+        if missed:
+            sep2 = QFrame()
+            sep2.setFrameShape(QFrame.Shape.HLine)
+            sep2.setStyleSheet("background-color: #3C4043;")
+            lay.addWidget(sep2)
+
+            mhdr = QLabel("\u2757  Words to practice:")
+            mhdr.setStyleSheet("font-size: 13px; font-weight: bold; color: #F4B400;")
+            lay.addWidget(mhdr)
+
+            # Show up to 30 unique missed words
+            unique_missed = list(dict.fromkeys(missed))[:30]
+            words_text = QLabel("  \u2022  ".join(unique_missed))
+            words_text.setWordWrap(True)
+            words_text.setStyleSheet(
+                "font-size: 13px; color: #EA4335; padding: 8px 12px; "
+                "background-color: #2A2020; border-radius: 8px;"
+            )
+            lay.addWidget(words_text)
+
+        # ── Close button ──────────────────────────────────────────────
+        lay.addSpacing(6)
+        close_btn = QPushButton("Done")
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #1A73E8;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                padding: 10px 36px;
+                font-size: 14px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #1557b0; }
+        """)
+        close_btn.clicked.connect(self.accept)
+        lay.addWidget(close_btn, 0, Qt.AlignmentFlag.AlignCenter)
+
+
+class PracticeModeWidget(QWidget):
+    """Shadowing / Reading-Practice coach.
+
+    Page 0 — Input: user pastes text + presses Start.
+    Page 1 — Active: coloured text + controls.
+    """
+
+    exit_requested = pyqtSignal()
+
+    # ── shared button stylesheet ──────────────────────────────────────
+    _BTN_CSS = """
+        QPushButton {
+            background-color: #282A2C;
+            color: #E3E3E3;
+            border: 1px solid #3C4043;
+            border-radius: 10px;
+            padding: 10px 22px;
+            font-size: 13px;
+        }
+        QPushButton:hover { background-color: #3C4043; }
+        QPushButton:disabled { color: #5F6368; }
+    """
+    _BTN_PRIMARY_CSS = """
+        QPushButton {
+            background-color: #1A73E8;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 12px 32px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        QPushButton:hover { background-color: #1557b0; }
+        QPushButton:disabled { background-color: #3C4043; color: #5F6368; }
+    """
+
+    def __init__(self, ai_manager, recorder, player, parent=None):
+        super().__init__(parent)
+        self.ai_manager = ai_manager
+        self.recorder = recorder
+        self.player = player
+        self.parent_window = parent
+        self.worker: PracticeWorkerThread | None = None
+        self._reference_words: list[str] = []
+        self._reference_display: list[str] = []
+
+        self.setObjectName("practiceModeWidget")
+        self._build_ui()
+
+    # ══════════════════════════════════════════════════════════════════
+    #  UI construction
+    # ══════════════════════════════════════════════════════════════════
+    def _build_ui(self):
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        self.pages = QStackedWidget()
+        outer.addWidget(self.pages)
+
+        # ── Page 0: Input ─────────────────────────────────────────────
+        input_page = QWidget()
+        input_page.setStyleSheet("background-color: #131314;")
+        ip_lay = QVBoxLayout(input_page)
+        ip_lay.setContentsMargins(40, 32, 40, 32)
+        ip_lay.setSpacing(18)
+
+        # Header row with title + close
+        hdr = QHBoxLayout()
+        title = QLabel("📖  Reading Practice")
+        title.setStyleSheet(
+            "font-size: 20px; font-weight: bold; color: #E3E3E3; background: transparent;"
+        )
+        hdr.addWidget(title)
+        hdr.addStretch()
+
+        close0 = QPushButton("✕")
+        close0.setFixedSize(36, 36)
+        close0.setCursor(Qt.CursorShape.PointingHandCursor)
+        close0.setStyleSheet("""
+            QPushButton {
+                background: transparent; border: none;
+                color: #9AA0A6; font-size: 18px; border-radius: 18px;
+            }
+            QPushButton:hover { background-color: #3C4043; color: #E3E3E3; }
+        """)
+        close0.clicked.connect(self._exit)
+        hdr.addWidget(close0)
+        ip_lay.addLayout(hdr)
+
+        desc = QLabel(
+            "Paste or type the text you'd like to practice reading aloud. "
+            "The app will listen to you and highlight each word green (correct) "
+            "or red (different). Click any word to hear its pronunciation."
+        )
+        desc.setWordWrap(True)
+        desc.setStyleSheet("font-size: 13px; color: #9AA0A6; background: transparent;")
+        ip_lay.addWidget(desc)
+
+        self.input_edit = QTextEdit()
+        self.input_edit.setPlaceholderText("Paste your practice text here…")
+        self.input_edit.setStyleSheet("""
+            QTextEdit {
+                background-color: #202124;
+                color: #E3E3E3;
+                border: 1px solid #3C4043;
+                border-radius: 12px;
+                padding: 16px;
+                font-size: 15px;
+                line-height: 1.6;
+            }
+            QTextEdit:focus { border-color: #8AB4F8; }
+        """)
+        self.input_edit.setMinimumHeight(220)
+        ip_lay.addWidget(self.input_edit, 1)
+
+        start_row = QHBoxLayout()
+        start_row.addStretch()
+        self.start_btn = QPushButton("▶  Start Practice")
+        self.start_btn.setStyleSheet(self._BTN_PRIMARY_CSS)
+        self.start_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.start_btn.clicked.connect(self._start_practice)
+        start_row.addWidget(self.start_btn)
+        start_row.addStretch()
+        ip_lay.addLayout(start_row)
+
+        self.pages.addWidget(input_page)  # index 0
+
+        # ── Page 1: Active ────────────────────────────────────────────
+        active_page = QWidget()
+        active_page.setStyleSheet("background-color: #131314;")
+        ap_lay = QVBoxLayout(active_page)
+        ap_lay.setContentsMargins(32, 24, 32, 20)
+        ap_lay.setSpacing(14)
+
+        # Top bar: status + close
+        top_bar = QHBoxLayout()
+        self.status_label = QLabel("⏳ Preparing…")
+        self.status_label.setStyleSheet(
+            "font-size: 13px; color: #9AA0A6; background: transparent;"
+        )
+        top_bar.addWidget(self.status_label)
+        top_bar.addStretch()
+
+        close1 = QPushButton("✕")
+        close1.setFixedSize(36, 36)
+        close1.setCursor(Qt.CursorShape.PointingHandCursor)
+        close1.setStyleSheet("""
+            QPushButton {
+                background: transparent; border: none;
+                color: #9AA0A6; font-size: 18px; border-radius: 18px;
+            }
+            QPushButton:hover { background-color: #3C4043; color: #E3E3E3; }
+        """)
+        close1.clicked.connect(self._finish)
+        top_bar.addWidget(close1)
+        ap_lay.addLayout(top_bar)
+
+        # Text browser
+        self.text_browser = QTextBrowser()
+        self.text_browser.setOpenLinks(False)
+        self.text_browser.anchorClicked.connect(self._on_word_clicked)
+        self.text_browser.setStyleSheet("""
+            QTextBrowser {
+                background-color: #202124;
+                border: 1px solid #3C4043;
+                border-radius: 12px;
+                padding: 20px;
+                font-size: 22px;
+                line-height: 1.8;
+            }
+        """)
+        ap_lay.addWidget(self.text_browser, 1)
+
+        # Control buttons
+        ctrl = QHBoxLayout()
+        ctrl.setSpacing(14)
+
+        self.pause_btn = QPushButton("⏸  Pause Mic")
+        self.pause_btn.setStyleSheet(self._BTN_CSS)
+        self.pause_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.pause_btn.setCheckable(True)
+        self.pause_btn.clicked.connect(self._toggle_pause)
+        ctrl.addWidget(self.pause_btn)
+
+        self.finish_btn = QPushButton("✓  Finish Practice")
+        self.finish_btn.setStyleSheet(self._BTN_PRIMARY_CSS)
+        self.finish_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.finish_btn.clicked.connect(self._finish)
+        ctrl.addWidget(self.finish_btn)
+
+        ap_lay.addLayout(ctrl)
+        self.pages.addWidget(active_page)  # index 1
+
+    # ══════════════════════════════════════════════════════════════════
+    #  Actions
+    # ══════════════════════════════════════════════════════════════════
+    def _start_practice(self):
+        import re
+        raw = self.input_edit.toPlainText().strip()
+        if not raw:
+            return
+
+        # Tokenise keeping punctuation attached for display
+        self._reference_display = raw.split()
+        self._reference_words = [
+            re.sub(r"[^\w']", "", w.lower()) for w in self._reference_display
+        ]
+        # Filter blanks
+        pairs = [(w, d) for w, d in zip(self._reference_words, self._reference_display) if w]
+        self._reference_words = [p[0] for p in pairs]
+        self._reference_display = [p[1] for p in pairs]
+
+        # Render initial (all grey)
+        initial_html = "&nbsp; ".join(
+            f'<a href="{w}" style="text-decoration:none;color:#E3E3E3;'
+            f'font-size:22px;">{d}</a>'
+            for w, d in zip(self._reference_words, self._reference_display)
+        )
+        self.text_browser.setHtml(initial_html)
+
+        # Switch to active page
+        self.pages.setCurrentIndex(1)
+        self.pause_btn.setChecked(False)
+        self.pause_btn.setText("⏸  Pause Mic")
+
+        # Launch worker
+        self.worker = PracticeWorkerThread(
+            self.ai_manager, self.recorder, self._reference_words
+        )
+        self.worker.reference_display = self._reference_display
+        self.worker.progress_html.connect(self._update_display)
+        self.worker.status_changed.connect(self._update_status)
+        self.worker.finished_signal.connect(self._on_worker_finished)
+        self.worker.start()
+
+    def _toggle_pause(self):
+        if self.worker is None:
+            return
+        if self.pause_btn.isChecked():
+            self.worker.pause()
+            self.pause_btn.setText("▶  Resume Mic")
+        else:
+            self.worker.resume()
+            self.pause_btn.setText("⏸  Pause Mic")
+
+    def _finish(self):
+        """Stop worker, show feedback, then go back to input page."""
+        # Grab results before stopping
+        word_status = []
+        if self.worker:
+            word_status = list(self.worker.last_word_status)
+
+        if self.worker and self.worker.isRunning():
+            self.worker.stop()
+            self.worker.wait(3000)
+        self.worker = None
+
+        # Show feedback if there's data
+        if word_status and self._reference_display:
+            dlg = PracticeFeedbackDialog(
+                self._reference_display, word_status, self
+            )
+            dlg.exec()
+
+        self.pages.setCurrentIndex(0)
+
+    def _exit(self):
+        """Stop everything and return to main chat."""
+        self._finish()
+        self.input_edit.clear()
+        self.exit_requested.emit()
+
+    # ── slots ─────────────────────────────────────────────────────────
+    def _update_display(self, html: str):
+        self.text_browser.setHtml(html)
+
+    def _update_status(self, state: str):
+        icons = {
+            "listening": "🎤 Listening…",
+            "transcribing": "⏳ Transcribing…",
+            "paused": "⏸ Paused",
+            "stopped": "⏹ Stopped",
+        }
+        self.status_label.setText(icons.get(state, state))
+
+    def _on_worker_finished(self):
+        self.status_label.setText("✅ Practice complete")
+
+    def _on_word_clicked(self, url):
+        """Pronounce the clicked word via TTS."""
+        word = url.toString()
+        if not word:
+            return
+        # Pause mic while playing
+        was_paused = self.worker and self.worker._paused
+        if self.worker and not was_paused:
+            self.worker.pause()
+
+        def _speak():
+            try:
+                audio, sr = self.ai_manager.text_to_speech(word)
+                self.player.play(audio, sr)
+            except Exception as e:
+                print(f"Practice TTS error: {e}")
+            finally:
+                if self.worker and not was_paused:
+                    self.worker.resume()
+
+        threading.Thread(target=_speak, daemon=True).start()
+
+
 class SettingsDialog(QDialog):
     """Settings dialog with font size and language options"""
     
@@ -2504,7 +3083,14 @@ class MainWindow(QMainWindow):
         )
         self.live_mode_widget.exit_requested.connect(self.exit_live_mode)
         self.stacked_widget.addWidget(self.live_mode_widget)  # Page 1: Live
-        
+
+        # --- Page 2: Reading Practice ---
+        self.practice_widget = PracticeModeWidget(
+            self.ai_manager, self.recorder, self.player, self
+        )
+        self.practice_widget.exit_requested.connect(self.exit_practice_mode)
+        self.stacked_widget.addWidget(self.practice_widget)  # Page 2: Practice
+
         main_layout.addWidget(self.stacked_widget, 1)
         
         # ===== INPUT BAR =====
@@ -2605,6 +3191,14 @@ class MainWindow(QMainWindow):
         self.context_donut = ContextDonut()
         button_row.addWidget(self.context_donut)
 
+        # PRACTICE MODE BUTTON (left of mic)
+        self.practice_btn = QPushButton("\U0001F4D6")
+        self.practice_btn.setObjectName("practiceStartButton")
+        self.practice_btn.setToolTip("Reading Practice")
+        self.practice_btn.clicked.connect(self.enter_practice_mode)
+        self.practice_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        button_row.addWidget(self.practice_btn)
+
         # MIC BUTTON (center-right) - Main voice button
         self.mic_btn = QPushButton("🎤")
         self.mic_btn.setObjectName("micButton")
@@ -2619,7 +3213,7 @@ class MainWindow(QMainWindow):
         self.live_btn.clicked.connect(self.enter_live_mode)
         self.live_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         button_row.addWidget(self.live_btn)
-        
+
         input_layout.addLayout(button_row)
         
         input_bar_wrapper_layout.addWidget(input_bar)
@@ -2898,7 +3492,27 @@ class MainWindow(QMainWindow):
         self.stacked_widget.setCurrentIndex(0)
         self.status_label.setText("Ready")
         print("💬 Returning to Chat Mode")
-    
+
+    def enter_practice_mode(self):
+        """Switch to Reading Practice mode"""
+        if self.ai_manager is None:
+            self.status_label.setText("AI not loaded!")
+            return
+        if self.is_recording:
+            self.stop_recording()
+        if self.is_speaking:
+            self.interrupt_speaking()
+        self.input_bar.setVisible(False)
+        self.stacked_widget.setCurrentIndex(2)
+        print("📖 Entering Reading Practice Mode")
+
+    def exit_practice_mode(self):
+        """Return to Chat Mode from Practice"""
+        self.input_bar.setVisible(True)
+        self.stacked_widget.setCurrentIndex(0)
+        self.status_label.setText("Ready")
+        print("💬 Returning to Chat Mode")
+
     def open_settings(self):
         """Open settings dialog"""
         old_whisper_model = self.whisper_model

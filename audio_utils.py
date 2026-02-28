@@ -245,17 +245,18 @@ class AudioPlayer:
             )
 
             # Wait for completion or stop signal
-            while self._paplay_proc.poll() is None and not self.should_stop:
+            proc = self._paplay_proc
+            while proc is not None and proc.poll() is None and not self.should_stop:
                 time.sleep(0.05)
 
-            if self.should_stop and self._paplay_proc.poll() is None:
-                self._paplay_proc.terminate()
-                self._paplay_proc.wait(timeout=2)
+            if self.should_stop and proc is not None and proc.poll() is None:
+                proc.terminate()
+                proc.wait(timeout=2)
                 print("Audio playback interrupted")
-            else:
-                rc = self._paplay_proc.returncode
+            elif proc is not None:
+                rc = proc.returncode
                 if rc and rc != 0:
-                    err = self._paplay_proc.stderr.read().decode(errors='replace').strip()
+                    err = proc.stderr.read().decode(errors='replace').strip()
                     print(f"paplay exit {rc}: {err}")
                 else:
                     print("Audio playback finished")

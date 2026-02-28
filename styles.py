@@ -403,6 +403,26 @@ QPushButton#liveStartButton:pressed {
     background-color: #3C4043;
 }
 
+QPushButton#practiceStartButton {
+    background-color: transparent;
+    color: #E3E3E3;
+    border: none;
+    border-radius: 30px;
+    min-width: 60px;
+    max-width: 60px;
+    min-height: 60px;
+    max-height: 60px;
+    font-size: 24px;
+}
+
+QPushButton#practiceStartButton:hover {
+    background-color: #282A2C;
+}
+
+QPushButton#practiceStartButton:pressed {
+    background-color: #3C4043;
+}
+
 /* ===== TOOLTIP ===== */
 QToolTip {
     background-color: #202124;

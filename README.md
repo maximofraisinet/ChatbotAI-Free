@@ -40,6 +40,12 @@ https://github.com/user-attachments/assets/c33bd6a7-a4ae-48cf-89c5-c72d019a0d53
 - **📄 PDF Document Chat**
   Attach a PDF directly into the conversation — the app extracts text, counts tokens, and shows a detailed confirmation dialog with context-window stats before injecting it. Ask questions about the document without any external vector DB or RAG pipeline.
 
+- **📖 Reading Practice Mode (Shadowing Coach)**
+  Paste or type any text, hit Start, and read it aloud. The app listens in real time via VAD + Whisper and colors each word as you go — **green** for correct, **red** for mispronounced, **grey** for not yet read. Click any word to hear its pronunciation via TTS. When you finish, a feedback dialog shows your grade (A+ → F), accuracy bar, per-word stats, and a list of missed words.
+
+- **⚙️ Configurable Whisper Model**
+  Choose your STT quality/speed trade-off from Settings — **base**, **small**, **medium**, or **large-v3**. The model change takes effect after a restart (the app offers to restart immediately).
+
 - **🎨 Modern, Customizable UI**
   - Dark theme inspired by Google Gemini.
   - Adjustable voice speed (0.5× – 2.0×), font size, and audio devices.
@@ -176,6 +182,7 @@ On the next launch, the voice scanner detects the new folder and shows a one-tim
 | 🎤 Mic button | Tap to record; tap again to send (or enable auto-send in Settings) |
 | ✨ Live button | Enter hands-free Live Mode |
 | 📎 Attach button | Upload a PDF document into the conversation context |
+| 📖 Practice button | Enter Reading Practice (Shadowing Coach) mode |
 | ⏹ Stop (during playback) | Interrupt the AI mid-response |
 | Context donut (bottom bar) | Click to see context window usage |
 
