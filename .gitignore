@@ -61,7 +61,7 @@ user_preferences.json
 voices/**
 !voices/kokoro-v1.0/
 !voices/kokoro-v1.0/.gitkeep
-!voices/voices_config.json
+voices/voices_config.json
 
 # Legacy loose .onnx / voices.json files at the repo root (safety net)
 voices.json

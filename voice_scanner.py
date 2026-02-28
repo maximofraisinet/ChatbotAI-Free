@@ -142,6 +142,19 @@ def scan_voices_folder(voices_dir: Optional[str] = None) -> dict:
             )
 
     result["has_any"] = result["kokoro"]["found"] or len(result["sherpa_voices"]) > 0
+
+    # ── Auto-update config ────────────────────────────────────────────────────
+    # Keep only entries that correspond to folders currently on disk.
+    # This removes stale entries when a voice pack is deleted, without
+    # losing classifications for packs that are still present.
+    present_folders = {v["folder"] for v in result["sherpa_voices"]}
+    reconciled_config = {
+        folder: lang
+        for folder, lang in config.items()
+        if folder in present_folders
+    }
+    _save_voices_config(reconciled_config)
+
     return result
 
 
