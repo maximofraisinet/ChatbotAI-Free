@@ -1,14 +1,13 @@
-# 🎙️🤖 Voice Chatbot: AI Language Practice Assistant
+# 🎙️🤖 ChatbotAI-Free — Local Voice AI Assistant
 
-A fully local voice chatbot designed for practicing **English** and **Spanish** conversation skills. It features high-quality, natural-sounding AI voices and operates in two distinct modes: **Classic Chat** and continuous **Live Mode**.
+A fully **offline** voice chatbot powered by local LLMs, high-quality neural TTS, and real-time speech recognition. Practice conversations, explore ideas, or just talk — entirely on your own hardware, with no cloud required.
 
 ---
 
 ### ✨ ChatbotAI-Free in Action
 
-**Normal Mode**
-<img width="1912" height="996" alt="Normal mode new" src="https://github.com/user-attachments/assets/71630fb8-6b97-42fc-b4e7-3f47f736936e" />
-*(Image of the new update)*
+**Classic Chat Mode**
+<img width="1912" height="996" alt="Normal mode" src="https://github.com/user-attachments/assets/71630fb8-6b97-42fc-b4e7-3f47f736936e" />
 
 https://github.com/user-attachments/assets/56a0d0cb-73ae-42df-8c5a-3f0938419d29
 
@@ -21,141 +20,173 @@ https://github.com/user-attachments/assets/c33bd6a7-a4ae-48cf-89c5-c72d019a0d53
 
 ## 🚀 Features
 
-- **🌐 Multi-Language Support**: Seamlessly switch between English (Kokoro TTS) and Spanish (Sherpa-ONNX TTS).
-- **🎯 Dual Conversation Modes**:
-    - **Classic Chat**: Traditional turn-by-turn conversation.
-    - **Live Mode**: Hands-free, continuous conversation with barge-in capability (interrupt the AI naturally).
-- **🗣️ Advanced Voice Capabilities**:
-    - Real-time, multilingual Speech-to-Text (via `faster-whisper`).
-    - High-quality, natural Text-to-Speech output.
-    - Voice Activity Detection (VAD) for precise end-of-speech detection.
-- **🧠 Local & Private AI**:
-    - Powered by local LLMs through **Ollama** (e.g., Llama 3.1, Mistral, Gemma 2).
-    - Streaming responses for instant audio and text feedback.
-    - Context-aware conversations with persistent history.
-- **🎨 Modern & Customizable UI**:
-    - Sleek dark theme inspired by Google Gemini.
-    - Adjustable font sizes and voice playback speeds.
-    - Visual feedback for voice activity.
-- **⚙️ Smart & Persistent**: User preferences (model, language, voice, etc.) are saved locally.
+- **🌐 Multilingual TTS — one engine, all languages**
+  [Kokoro TTS v1.0](https://github.com/thewh1teagle/kokoro-onnx) handles both **English** and **Spanish** out of the box (54 voices included). Add any additional language via a Sherpa-ONNX voice pack — the app auto-detects it and asks you which language it belongs to.
+
+- **🎯 Two Conversation Modes**
+  - **Classic Chat** — turn-by-turn, with full markdown rendering and streaming responses.
+  - **Live Mode** — hands-free, continuous conversation with barge-in detection (interrupt the AI mid-sentence naturally).
+
+- **🗣️ Advanced Voice Pipeline**
+  - Real-time Speech-to-Text via [`faster-whisper`](https://github.com/guillaumekln/faster-whisper).
+  - Voice Activity Detection (VAD) for precise end-of-speech detection.
+  - PipeWire-native audio playback — TTS never blocks other apps.
+
+- **🧠 Fully Local & Private**
+  - LLM inference via [Ollama](https://ollama.ai/) — Llama, Mistral, Gemma, and any model you pull.
+  - Streaming responses with simultaneous TTS generation.
+  - Persistent conversation history with context-window indicator.
+
+- **🎨 Modern, Customizable UI**
+  - Dark theme inspired by Google Gemini.
+  - Adjustable voice speed (0.5× – 2.0×), font size, and audio devices.
+  - Collapsible reasoning panel for thinking-capable models.
+
+- **🔍 Smart Voice Scanner**
+  On startup the app scans the `voices/` folder. New voice packs are detected automatically — you'll be prompted once to classify each one by language. No manual config needed.
+
+---
 
 ## 🛠️ Technology Stack
 
-| Component            | Technology                                                                                             |
-| -------------------- | ------------------------------------------------------------------------------------------------------ |
-| **Application & UI** | Python, PyQt6                                                                                          |
-| **LLM Inference**    | [Ollama](https://ollama.ai/) (Llama 3.1, Mistral, etc.)                                                  |
-| **Speech-to-Text**   | [faster-whisper](https://github.com/guillaumekln/faster-whisper)                                         |
-| **Text-to-Speech**   | [Kokoro TTS](https://github.com/thewh1teagle/kokoro-onnx) (English), [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx) (Spanish) |
-| **Audio I/O**        | PyAudio / sounddevice, NumPy                                                                           |
+| Component | Technology |
+|---|---|
+| **Application & UI** | Python 3.10+, PyQt6 |
+| **LLM Inference** | [Ollama](https://ollama.ai/) |
+| **Speech-to-Text** | [faster-whisper](https://github.com/guillaumekln/faster-whisper) |
+| **Text-to-Speech (primary)** | [Kokoro ONNX v1.0](https://github.com/thewh1teagle/kokoro-onnx) |
+| **Text-to-Speech (extra voices)** | [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx) (optional) |
+| **Audio I/O** | sounddevice, NumPy, paplay (PipeWire) |
+
+---
 
 ## 📦 Getting Started
 
 ### 1. Prerequisites
 
 - **Python** 3.10 or 3.11
-- **Ollama**: Make sure it is installed and running. Download from [ollama.ai](https://ollama.ai/).
+- **Ollama** installed and running — [ollama.ai](https://ollama.ai/)
 - **Git**
 
-### 2. Installation & Setup
+### 2. Clone & Install
 
-#### Step 1: Clone the Repository
-Clone this repository to your local machine:
 ```bash
-git clone https://github.com/Maximuszoo/ChatbotAI-Free
-cd ChatbotAI-English
-```
-#### Step 2: Create a Virtual Environment (Recommended)
-```bash
+git clone https://github.com/maximofraisinet/ChatbotAI-Free
+cd ChatbotAI-Free
+
 python3 -m venv venv
-source venv/bin/activate
-# On Windows, use: venv\Scripts\activate
-```
+source venv/bin/activate   # Windows: venv\Scripts\activate
 
-#### Step 3: Install Dependencies
-Install all required Python packages from `requirements.txt`:
-```bash
 pip install -r requirements.txt
 ```
-For **NVIDIA GPU** support (recommended for `faster-whisper`), ensure you have CUDA installed and install the GPU-enabled `onnxruntime`:
+
+For NVIDIA GPU acceleration (recommended):
 ```bash
 pip install onnxruntime-gpu
 ```
 
-#### Step 4: Download TTS Models
-The TTS models are too large for GitHub and must be downloaded manually.
+### 3. Download the Kokoro v1.0 Voice Model
 
-**A. English TTS Model (Kokoro)**
-1.  Download the following files from the [Kokoro-82M releases](https://github.com/thewh1teagle/kokoro-onnx/releases) page:
-    - `kokoro-v0_19.onnx`
-    - `voices.json`
-2.  Place both files inside the `voices/english/` directory.
+Kokoro powers **all built-in voices** (English + Spanish). The model files are too large for GitHub, so download them manually:
 
-**B. Spanish TTS Models (Sherpa-ONNX)** (Optional)
-The application automatically detects any Spanish voice installed in the `voices/spanish/` directory.
+1. Go to the [kokoro-onnx releases page](https://github.com/thewh1teagle/kokoro-onnx/releases).
+2. Download **`kokoro-v1.0.onnx`** and **`voices-v1.0.bin`**.
+3. Place both files inside `voices/kokoro-v1.0/`:
 
-1.  First, install the `sherpa-onnx` package:
-    ```bash
-    pip install sherpa-onnx
-    ```
-2.  For each voice you want to add, download the model files from the [Piper-Voices Hugging Face repos](https://huggingface.co/csukuangfj).
-    - [Daniela (Argentine Spanish)](https://huggingface.co/csukuangfj/vits-piper-es_AR-daniela-high/tree/main)
-    - [Miro (European Spanish)](https://huggingface.co/csukuangfj/vits-piper-es_ES-miro-high/tree/main)
-
-3.  Create a sub-folder for each voice inside `voices/spanish/` (e.g., `voices/spanish/Daniela/`).
-4.  Download and place the following three files into the new sub-folder:
-    - The `.onnx` model file.
-    - `tokens.txt`
-    - The `espeak-ng-data/` directory (extract it from the `.tar.bz2` archive).
-
-Your final `voices` directory should look like this:
 ```
 voices/
-├── english/
-│   ├── kokoro-v0_19.onnx    # English TTS model
-│   └── voices.json          # English voice configs
-└── spanish/
-    ├── Daniela/             # Spanish voice 1
-    │   ├── es_AR-daniela-high.onnx
-    │   ├── tokens.txt
-    │   └── espeak-ng-data/
-    └── Miro/                # Spanish voice 2
-        ├── es_ES-miro-high.onnx
-        ├── tokens.txt
-        └── espeak-ng-data/
+└── kokoro-v1.0/
+    ├── kokoro-v1.0.onnx    ← ~300 MB neural TTS model
+    └── voices-v1.0.bin     ← ~27 MB  (54 English + Spanish voices)
 ```
 
-#### Step 5: Pull an Ollama Model
-Download a model for Ollama to use. `llama3.1:8b` is a great starting point.
+### 4. Pull an Ollama Model
+
 ```bash
 ollama pull llama3.1:8b
 ```
 
-### 3. Run the Application
-Launch the chatbot with:
+### 5. Run
+
 ```bash
 python main.py
 ```
 
+On first launch the voice scanner checks `voices/`. If the Kokoro files are in place you're ready to go immediately.
+
+---
+
+## 🌍 Adding More Voices (Sherpa-ONNX)
+
+Want voices in **other languages** — French, Italian, German, Portuguese, and more? Use any [Piper-compatible Sherpa-ONNX VITS pack](https://huggingface.co/csukuangfj):
+
+### Step 1 — Install Sherpa-ONNX
+
+```bash
+pip install sherpa-onnx
+```
+
+### Step 2 — Download a voice pack
+
+Browse available voices at [huggingface.co/csukuangfj](https://huggingface.co/csukuangfj). For example, the Argentine Spanish "Daniela" voice:
+
+```
+https://huggingface.co/csukuangfj/vits-piper-es_AR-daniela-high/tree/main
+```
+
+Download these three items from the repo:
+- The `.onnx` model file
+- `tokens.txt`
+- The `espeak-ng-data/` directory
+
+### Step 3 — Drop the folder into `voices/`
+
+Place the downloaded folder **directly** inside `voices/` (not nested deeper):
+
+```
+voices/
+├── kokoro-v1.0/                         ← built-in (Kokoro)
+│   ├── kokoro-v1.0.onnx
+│   └── voices-v1.0.bin
+└── vits-piper-es_AR-daniela-high/       ← your new Sherpa voice
+    ├── es_AR-daniela-high.onnx
+    ├── tokens.txt
+    └── espeak-ng-data/
+```
+
+### Step 4 — Restart the app
+
+On the next launch, the voice scanner detects the new folder and shows a one-time dialog asking which language to assign it to. After you confirm, the voice appears in the voice selector dropdown — no further setup needed.
+
+> **Any valid Sherpa-ONNX VITS model works.** The app identifies a Sherpa pack by the presence of a `.onnx` file and an `espeak-ng-data/` sub-directory inside the folder.
+
+---
+
 ## ⌨️ Usage
 
-- **🧠 Model & Voice Selection**: Use the dropdown menus at the top to select your desired Ollama model and TTS voice.
-- **⚙️ Settings**: Click the gear icon to configure:
-    - **Language**: English or Spanish.
-    - **Voice Speed**: Adjust playback rate from 0.5x to 2.0x.
-    - **Font Size**: Small, Medium, or Large.
-    - **Voice Mode**: Toggle between auto-sending your recording or reviewing it first.
+| Control | Action |
+|---|---|
+| Top dropdowns | Select LLM model and active voice |
+| ⚙️ Settings | Language, voice speed, font size, audio devices, recording mode |
+| 🎤 Mic button | Tap to record; tap again to send (or enable auto-send in Settings) |
+| ✨ Live button | Enter hands-free Live Mode |
+| ⏹ Stop (during playback) | Interrupt the AI mid-response |
+| Context donut (bottom bar) | Click to see context window usage |
+
+---
 
 ## 🤝 Contributing
 
-Contributions are welcome! If you have ideas for new features, bug fixes, or improvements, please open an issue or submit a pull request.
+Contributions are welcome! Open an issue or submit a pull request.
 
-1.  Fork the Project
-2.  Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3.  Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4.  Push to the Branch (`git push origin feature/AmazingFeature`)
-5.  Open a Pull Request
+1. Fork the project
+2. Create your feature branch: `git checkout -b feature/AmazingFeature`
+3. Commit your changes: `git commit -m 'Add AmazingFeature'`
+4. Push: `git push origin feature/AmazingFeature`
+5. Open a Pull Request
+
+---
 
 ## 📄 License
 
-This project is licensed under **The Unlicense**. See the `LICENSE` file for details.
+This project is released under **The Unlicense**. See `LICENSE` for details.
