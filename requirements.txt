@@ -14,13 +14,9 @@ faster-whisper>=0.10.0
 # LLM (Ollama)
 ollama>=0.1.0
 
-# Text-to-Speech (Kokoro ONNX) - English
-kokoro-onnx>=0.1.0  # Official Kokoro TTS library
+# Text-to-Speech (Kokoro ONNX v1.0) - English & Spanish
+kokoro-onnx>=0.4.0  # Official Kokoro TTS library (v1.0+ for multilingual)
 onnxruntime-gpu>=1.16.0  # Use onnxruntime-gpu for CUDA support
-
-# Text-to-Speech (Sherpa-ONNX) - Spanish
-# Install separately: pip install sherpa-onnx
-# sherpa-onnx  # Uncomment if you want Spanish support
 
 # Note: Markdown rendering is done natively with regex - no additional library needed
 # The MarkdownRenderer class in main.py handles basic markdown formatting

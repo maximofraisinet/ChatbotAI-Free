@@ -21,7 +21,7 @@ LANGUAGES = {
         "code": "es", 
         "whisper_code": "es",
         "name": "Español",
-        "tts_engine": "sherpa",
+        "tts_engine": "kokoro",
     },
 }
 
@@ -32,7 +32,7 @@ DEFAULT_PREFERENCES = {
     "language": "english",  # english, spanish
     "voice_speed": 1.0,  # Voice speed multiplier (0.5 to 2.0)
     "english_voice": "af_bella",  # English voice preference
-    "spanish_voice": "vits-piper-es_AR-daniela-high",  # Spanish voice preference
+    "spanish_voice": "ef_dora",  # Spanish voice preference (Kokoro)
     "output_device": -1,  # Audio output device index (-1 = system default)
     "input_device": -1,  # Audio input device index (-1 = system default)
 }

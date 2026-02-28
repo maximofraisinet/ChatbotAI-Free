@@ -1,6 +1,7 @@
 """
-Wrapper for Kokoro TTS to handle the pickle issue with voices.json
-Supports chunking long text into multiple segments
+Wrapper for Kokoro TTS v1.0
+Supports chunking long text into multiple segments.
+Voices are loaded from a NumPy binary file (voices-v1.0.bin, formato npz).
 """
 
 import numpy as np
@@ -16,23 +17,16 @@ class KokoroWrapper:
     
     def __init__(self, model_path: str, voices_path: str):
         """
-        Initialize Kokoro with allow_pickle workaround
-        
+        Initialize Kokoro v1.0
+
         Args:
-            model_path: Path to the ONNX model
-            voices_path: Path to the voices file (.json)
+            model_path: Path to the ONNX model (e.g., voices/kokoro-v1.0.onnx)
+            voices_path: Path to the voices binary file (e.g., voices/voices-v1.0.bin)
         """
-        # Load voices from JSON
-        print("Loading voices from JSON...")
-        import json
-        with open(voices_path, 'r') as f:
-            voices_data = json.load(f)
-        
-        # Convert to numpy arrays
-        self.voices = {}
-        for voice_name, voice_array in voices_data.items():
-            self.voices[voice_name] = np.array(voice_array, dtype=np.float32)
-        
+        # Load voices from NumPy binary (npz format)
+        print(f"Loading voices from binary file: {voices_path}")
+        data = np.load(voices_path, allow_pickle=False)
+        self.voices = {name: data[name].astype(np.float32) for name in data.files}
         print(f"Loaded {len(self.voices)} voices: {list(self.voices.keys())[:5]}...")
         
         # Create Kokoro instance without loading voices
@@ -56,13 +50,13 @@ class KokoroWrapper:
         
         print("Kokoro wrapper initialized successfully!")
     
-    def _split_text(self, text: str) -> list:
+    def _split_text(self, text: str, lang: str = "en-us") -> list:
         """
         Split text into chunks that fit within phoneme limit.
         Tries to split at sentence boundaries first, then at phrases.
         """
         # Split by sentences first
-        sentences = re.split(r'(?<=[.!?])\s+', text)
+        sentences = re.split(r'(?<=[.!?])'+ r'\s+', text)
         
         chunks = []
         current_chunk = ""
@@ -72,7 +66,7 @@ class KokoroWrapper:
             test_chunk = current_chunk + " " + sentence if current_chunk else sentence
             
             try:
-                phonemes = self.tokenizer.phonemize(test_chunk, "en-us")
+                phonemes = self.tokenizer.phonemize(test_chunk, lang)
                 if len(phonemes) < MAX_PHONEME_LENGTH:
                     current_chunk = test_chunk
                 else:
@@ -81,7 +75,7 @@ class KokoroWrapper:
                         chunks.append(current_chunk.strip())
                     
                     # Check if single sentence is too long
-                    sentence_phonemes = self.tokenizer.phonemize(sentence, "en-us")
+                    sentence_phonemes = self.tokenizer.phonemize(sentence, lang)
                     if len(sentence_phonemes) < MAX_PHONEME_LENGTH:
                         current_chunk = sentence
                     else:
@@ -89,7 +83,7 @@ class KokoroWrapper:
                         phrases = re.split(r'[,;:]\s*', sentence)
                         for phrase in phrases:
                             if phrase.strip():
-                                phrase_phonemes = self.tokenizer.phonemize(phrase.strip(), "en-us")
+                                phrase_phonemes = self.tokenizer.phonemize(phrase.strip(), lang)
                                 if len(phrase_phonemes) < MAX_PHONEME_LENGTH:
                                     chunks.append(phrase.strip())
                                 else:
@@ -98,7 +92,7 @@ class KokoroWrapper:
                                     partial = ""
                                     for word in words:
                                         test = partial + " " + word if partial else word
-                                        test_ph = self.tokenizer.phonemize(test, "en-us")
+                                        test_ph = self.tokenizer.phonemize(test, lang)
                                         if len(test_ph) < MAX_PHONEME_LENGTH:
                                             partial = test
                                         else:
@@ -171,7 +165,7 @@ class KokoroWrapper:
         sample_rate = 24000
         
         # Split text into manageable chunks
-        chunks = self._split_text(text)
+        chunks = self._split_text(text, lang)
         print(f"Split text into {len(chunks)} chunks")
         
         # Generate audio for each chunk

@@ -180,74 +180,98 @@ class AudioRecorder:
 
 
 class AudioPlayer:
-    """Plays audio with threading support"""
-    
+    """Plays audio via paplay (PipeWire), avoids exclusive ALSA device locking."""
+
     def __init__(self, sample_rate=24000, device=None):
         self.sample_rate = sample_rate
-        self.device = device  # None = system default, int = specific device index
+        self.device = device  # reserved for future use / info only
         self.is_playing = False
         self.should_stop = False
-    
+        self._paplay_proc = None
+        self._tmp_path = None
+
     def play(self, audio_data, sample_rate=None):
         """
-        Play audio data
-        
+        Play audio data through PipeWire using paplay.
+        Writing a temporary WAV file and spawning paplay lets PipeWire mix
+        the output with other apps (YouTube, YT Music, etc.) without conflict.
+
         Args:
-            audio_data: numpy array of audio samples
+            audio_data: numpy float32 array of audio samples (mono)
             sample_rate: override sample rate (optional)
         """
-        if sample_rate is not None:
-            actual_rate = sample_rate
-        else:
-            actual_rate = self.sample_rate
-            
+        import os
+        import time
+        import wave
+        import tempfile
+        import subprocess
+
+        actual_rate = sample_rate if sample_rate is not None else self.sample_rate
+
         self.is_playing = True
         self.should_stop = False
-        
+        self._paplay_proc = None
+        self._tmp_path = None
+
         try:
-            # Ensure audio is float32 and in range [-1, 1]
+            # Ensure float32 and normalize to [-1, 1]
             if audio_data.dtype != np.float32:
                 audio_data = audio_data.astype(np.float32)
-            
-            # Normalize if needed
             max_val = np.abs(audio_data).max()
             if max_val > 1.0:
                 audio_data = audio_data / max_val
-                print(f"Normalized audio from max {max_val}")
-            
-            # Resample to device's native rate if needed (avoids paInvalidSampleRate)
-            try:
-                out_device = self.device if self.device is not None and self.device >= 0 else sd.default.device[1]
-                device_info = sd.query_devices(out_device, 'output')
-                device_rate = int(device_info['default_samplerate'])
-            except Exception:
-                device_rate = actual_rate
-                out_device = self.device if self.device is not None and self.device >= 0 else None
 
-            if actual_rate != device_rate:
-                new_length = int(len(audio_data) * device_rate / actual_rate)
-                old_idx = np.arange(len(audio_data))
-                new_idx = np.linspace(0, len(audio_data) - 1, new_length)
-                audio_data = np.interp(new_idx, old_idx, audio_data).astype(np.float32)
-                print(f"Resampled audio from {actual_rate}Hz to {device_rate}Hz")
-                actual_rate = device_rate
+            # Convert to int16 for WAV
+            audio_int16 = (audio_data * 32767.0).clip(-32768, 32767).astype(np.int16)
 
-            print(f"Playing audio: {len(audio_data)} samples at {actual_rate}Hz")
-            print(f"Duration: {len(audio_data) / actual_rate:.2f} seconds")
-            print(f"Audio range: [{audio_data.min():.3f}, {audio_data.max():.3f}]")
-            
-            sd.play(audio_data, actual_rate, device=out_device)
-            
-            # Wait in small increments so we can check for stop signal
-            import time
-            while sd.get_stream().active and not self.should_stop:
-                time.sleep(0.1)
-            
-            if self.should_stop:
+            # Write temp WAV
+            fd, tmp_path = tempfile.mkstemp(suffix='.wav')
+            os.close(fd)
+            self._tmp_path = tmp_path
+
+            with wave.open(tmp_path, 'wb') as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)          # int16 = 2 bytes
+                wf.setframerate(actual_rate)
+                wf.writeframes(audio_int16.tobytes())
+
+            duration = len(audio_data) / actual_rate
+            print(f"Playing audio via paplay: {duration:.2f}s @ {actual_rate}Hz")
+
+            self._paplay_proc = subprocess.Popen(
+                ['paplay', tmp_path],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+            )
+
+            # Wait for completion or stop signal
+            while self._paplay_proc.poll() is None and not self.should_stop:
+                time.sleep(0.05)
+
+            if self.should_stop and self._paplay_proc.poll() is None:
+                self._paplay_proc.terminate()
+                self._paplay_proc.wait(timeout=2)
                 print("Audio playback interrupted")
             else:
-                print("Audio playback finished")
-            
+                rc = self._paplay_proc.returncode
+                if rc and rc != 0:
+                    err = self._paplay_proc.stderr.read().decode(errors='replace').strip()
+                    print(f"paplay exit {rc}: {err}")
+                else:
+                    print("Audio playback finished")
+
+        except FileNotFoundError:
+            # paplay not installed — fall back to sounddevice
+            print("paplay not found, falling back to sounddevice")
+            try:
+                sd.play(audio_data, actual_rate)
+                while sd.get_stream().active and not self.should_stop:
+                    import time
+                    time.sleep(0.05)
+                if self.should_stop:
+                    sd.stop()
+            except Exception as e2:
+                print(f"sounddevice fallback error: {e2}")
         except Exception as e:
             print(f"Playback error: {e}")
             import traceback
@@ -255,9 +279,18 @@ class AudioPlayer:
         finally:
             self.is_playing = False
             self.should_stop = False
-    
+            self._paplay_proc = None
+            # Remove temp file
+            if self._tmp_path:
+                try:
+                    os.unlink(self._tmp_path)
+                except OSError:
+                    pass
+                self._tmp_path = None
+
     def stop(self):
         """Stop current playback"""
         self.should_stop = True
-        sd.stop()
+        if self._paplay_proc and self._paplay_proc.poll() is None:
+            self._paplay_proc.terminate()
         self.is_playing = False

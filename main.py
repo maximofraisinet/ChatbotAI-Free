@@ -8,11 +8,11 @@ import numpy as np
 import threading
 import queue
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, 
-    QHBoxLayout, QLabel, QScrollArea, QPushButton, 
+    QApplication, QMainWindow, QWidget, QVBoxLayout,
+    QHBoxLayout, QLabel, QScrollArea, QPushButton,
     QComboBox, QFrame, QSpacerItem, QSizePolicy, QTextEdit,
     QDialog, QCheckBox, QStackedWidget, QGraphicsDropShadowEffect,
-    QTextBrowser, QSlider
+    QTextBrowser, QSlider, QRadioButton, QButtonGroup
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, pyqtSlot, QTimer, QPropertyAnimation, QEasingCurve, QRect
 from PyQt6.QtGui import QFont, QColor, QPainter, QPen
@@ -1621,7 +1621,7 @@ class SettingsDialog(QDialog):
         """)
         layout.addWidget(self.language_combo)
         
-        lang_help = QLabel("English uses Kokoro TTS • Español uses Sherpa-ONNX (Marta voice)")
+        lang_help = QLabel("Both languages powered by Kokoro TTS v1.0")
         lang_help.setWordWrap(True)
         lang_help.setStyleSheet("font-size: 11px; color: #9AA0A6; margin-left: 4px;")
         layout.addWidget(lang_help)
@@ -1919,6 +1919,292 @@ class SettingsDialog(QDialog):
         return self._mic_indices[self.mic_combo.currentIndex()]
 
 
+class VoiceSetupDialog(QDialog):
+    """
+    Shown at startup when NO voice packs are detected.
+    Guides the user to download Kokoro v1.0 or a Sherpa-ONNX voice.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Voice Setup Required")
+        self.setModal(True)
+        self.setMinimumWidth(520)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(30, 28, 30, 24)
+        layout.setSpacing(16)
+
+        # ── Icon + title ───────────────────────────────────────────────────
+        title_row = QHBoxLayout()
+        icon_lbl = QLabel("🎙️")
+        icon_lbl.setStyleSheet("font-size: 36px;")
+        title_row.addWidget(icon_lbl)
+        title_row.addSpacing(12)
+
+        title_col = QVBoxLayout()
+        title = QLabel("No Voice Packs Found")
+        title.setStyleSheet("font-size: 20px; font-weight: bold; color: #E3E3E3;")
+        subtitle = QLabel("Your AI assistant needs a voice to speak.")
+        subtitle.setStyleSheet("font-size: 13px; color: #9AA0A6;")
+        title_col.addWidget(title)
+        title_col.addWidget(subtitle)
+        title_row.addLayout(title_col, 1)
+        layout.addLayout(title_row)
+
+        # ── Separator ──────────────────────────────────────────────────────
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet("background-color: #3C4043; margin: 4px 0;")
+        layout.addWidget(sep)
+
+        # ── Instructions ───────────────────────────────────────────────────
+        intro = QLabel(
+            "Drop your voice model files into the <b>voices/</b> folder, "
+            "then restart the app. Choose one of the options below to get started:"
+        )
+        intro.setWordWrap(True)
+        intro.setStyleSheet("font-size: 13px; color: #C8C8C8; line-height: 1.5;")
+        layout.addWidget(intro)
+
+        # ── Option A — Kokoro v1.0 ─────────────────────────────────────────
+        card_a = QFrame()
+        card_a.setStyleSheet("""
+            QFrame { background-color: #282A2C; border-radius: 10px;
+                     border: 1px solid #3C4043; }
+        """)
+        card_a_layout = QVBoxLayout(card_a)
+        card_a_layout.setContentsMargins(16, 14, 16, 14)
+        card_a_layout.setSpacing(6)
+
+        lbl_a_title = QLabel("⭐  Recommended — Kokoro TTS v1.0")
+        lbl_a_title.setStyleSheet("font-size: 14px; font-weight: bold; color: #8AB4F8;")
+        card_a_layout.addWidget(lbl_a_title)
+
+        lbl_a_desc = QLabel(
+            "High-quality neural TTS. Supports English and Spanish out of the box.\n"
+            "Download <b>kokoro-v1.0.onnx</b> and <b>voices-v1.0.bin</b>, then "
+            "place them inside <code>voices/kokoro-v1.0/</code>."
+        )
+        lbl_a_desc.setWordWrap(True)
+        lbl_a_desc.setStyleSheet("font-size: 12px; color: #C8C8C8;")
+        card_a_layout.addWidget(lbl_a_desc)
+
+        btn_a = QPushButton("Open Kokoro Releases on GitHub →")
+        btn_a.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_a.setStyleSheet("""
+            QPushButton {
+                background-color: #1A73E8; color: white; border: none;
+                border-radius: 6px; padding: 7px 16px; font-size: 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #1557b0; }
+        """)
+        btn_a.clicked.connect(
+            lambda: __import__("webbrowser").open(
+                "https://github.com/thewh1teagle/kokoro-onnx/releases"
+            )
+        )
+        card_a_layout.addWidget(btn_a)
+        layout.addWidget(card_a)
+
+        # ── Option B — Sherpa-ONNX ─────────────────────────────────────────
+        card_b = QFrame()
+        card_b.setStyleSheet("""
+            QFrame { background-color: #282A2C; border-radius: 10px;
+                     border: 1px solid #3C4043; }
+        """)
+        card_b_layout = QVBoxLayout(card_b)
+        card_b_layout.setContentsMargins(16, 14, 16, 14)
+        card_b_layout.setSpacing(6)
+
+        lbl_b_title = QLabel("🌍  More Languages — Sherpa-ONNX Voices")
+        lbl_b_title.setStyleSheet("font-size: 14px; font-weight: bold; color: #34A853;")
+        card_b_layout.addWidget(lbl_b_title)
+
+        lbl_b_desc = QLabel(
+            "Add extra language voices using Sherpa-ONNX VITS packs.\n"
+            "Download a voice folder and place it directly inside "
+            "<code>voices/</code> (e.g. <code>voices/vits-piper-es_AR-daniela-high/</code>)."
+        )
+        lbl_b_desc.setWordWrap(True)
+        lbl_b_desc.setStyleSheet("font-size: 12px; color: #C8C8C8;")
+        card_b_layout.addWidget(lbl_b_desc)
+
+        btn_b = QPushButton("Browse Sherpa-ONNX Voices on HuggingFace →")
+        btn_b.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_b.setStyleSheet("""
+            QPushButton {
+                background-color: #2D5A27; color: #34A853; border: none;
+                border-radius: 6px; padding: 7px 16px; font-size: 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #3A7033; color: white; }
+        """)
+        btn_b.clicked.connect(
+            lambda: __import__("webbrowser").open(
+                "https://huggingface.co/csukuangfj/vits-piper-es_AR-daniela-high/tree/main"
+            )
+        )
+        card_b_layout.addWidget(btn_b)
+        layout.addWidget(card_b)
+
+        # ── Open folder button ─────────────────────────────────────────────
+        open_folder_btn = QPushButton("📁  Open voices/ Folder")
+        open_folder_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        open_folder_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #3C4043; color: #E3E3E3; border: none;
+                border-radius: 6px; padding: 8px 16px; font-size: 13px;
+            }
+            QPushButton:hover { background-color: #5F6368; }
+        """)
+        open_folder_btn.clicked.connect(self._open_voices_folder)
+        layout.addWidget(open_folder_btn)
+
+        # ── Dismiss ────────────────────────────────────────────────────────
+        close_btn = QPushButton("Continue Anyway (text-only mode)")
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent; color: #9AA0A6; border: none;
+                padding: 6px; font-size: 12px;
+            }
+            QPushButton:hover { color: #E3E3E3; }
+        """)
+        close_btn.clicked.connect(self.accept)
+        layout.addWidget(close_btn, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        self.setStyleSheet("QDialog { background-color: #202124; }")
+
+    def _open_voices_folder(self):
+        import subprocess, os
+        voices_dir = os.path.abspath("voices")
+        os.makedirs(voices_dir, exist_ok=True)
+        try:
+            subprocess.Popen(["xdg-open", voices_dir])
+        except Exception:
+            pass
+
+
+class NewVoiceClassifierDialog(QDialog):
+    """
+    Shown once per newly-discovered Sherpa voice folder.
+    Asks the user which language the voice pack belongs to.
+    The choice is persisted so the dialog never re-appears for the same folder.
+    """
+
+    def __init__(self, folder_name: str, parent=None):
+        super().__init__(parent)
+        self.folder_name = folder_name
+        self.selected_language: str = "english"  # default
+
+        self.setWindowTitle("New Voice Pack Detected")
+        self.setModal(True)
+        self.setMinimumWidth(460)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(28, 26, 28, 22)
+        layout.setSpacing(14)
+
+        # ── Header ─────────────────────────────────────────────────────────
+        header_row = QHBoxLayout()
+        icon = QLabel("🎉")
+        icon.setStyleSheet("font-size: 32px;")
+        header_row.addWidget(icon)
+        header_row.addSpacing(12)
+
+        hdr_col = QVBoxLayout()
+        hdr_title = QLabel("New Voice Pack Detected!")
+        hdr_title.setStyleSheet("font-size: 18px; font-weight: bold; color: #8AB4F8;")
+        hdr_sub = QLabel(f"<code>{folder_name}</code>")
+        hdr_sub.setStyleSheet("font-size: 12px; color: #9AA0A6;")
+        hdr_col.addWidget(hdr_title)
+        hdr_col.addWidget(hdr_sub)
+        header_row.addLayout(hdr_col, 1)
+        layout.addLayout(header_row)
+
+        # ── Separator ──────────────────────────────────────────────────────
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet("background-color: #3C4043; margin: 2px 0;")
+        layout.addWidget(sep)
+
+        # ── Language prompt ────────────────────────────────────────────────
+        prompt = QLabel(
+            "Which language should <b>ChatbotAI</b> use this voice pack for?"
+        )
+        prompt.setWordWrap(True)
+        prompt.setStyleSheet("font-size: 13px; color: #C8C8C8;")
+        layout.addWidget(prompt)
+
+        # ── Radio buttons ──────────────────────────────────────────────────
+        radio_style = """
+            QRadioButton {
+                color: #E3E3E3; font-size: 14px; spacing: 10px;
+                padding: 10px 14px; border-radius: 8px;
+            }
+            QRadioButton:hover { background-color: #2A2B2E; }
+            QRadioButton:checked { color: #8AB4F8; }
+            QRadioButton::indicator { width: 18px; height: 18px; }
+            QRadioButton::indicator:unchecked {
+                border: 2px solid #5F6368; border-radius: 9px;
+                background-color: #202124;
+            }
+            QRadioButton::indicator:checked {
+                border: 2px solid #1A73E8; border-radius: 9px;
+                background-color: #1A73E8;
+            }
+        """
+
+        radio_box = QFrame()
+        radio_box.setStyleSheet(
+            "QFrame { background-color: #282A2C; border-radius: 10px;"
+            "border: 1px solid #3C4043; }"
+        )
+        radio_layout = QVBoxLayout(radio_box)
+        radio_layout.setContentsMargins(8, 8, 8, 8)
+        radio_layout.setSpacing(4)
+
+        self._btn_group = QButtonGroup(self)
+
+        self._radio_en = QRadioButton("🇺🇸  English")
+        self._radio_en.setStyleSheet(radio_style)
+        self._radio_en.setChecked(True)
+        self._btn_group.addButton(self._radio_en)
+        radio_layout.addWidget(self._radio_en)
+
+        self._radio_es = QRadioButton("🇪🇸  Spanish / Español")
+        self._radio_es.setStyleSheet(radio_style)
+        self._btn_group.addButton(self._radio_es)
+        radio_layout.addWidget(self._radio_es)
+
+        layout.addWidget(radio_box)
+
+        # ── Confirm button ─────────────────────────────────────────────────
+        confirm_btn = QPushButton("Save & Continue")
+        confirm_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        confirm_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #1A73E8; color: white; border: none;
+                border-radius: 8px; padding: 10px 24px;
+                font-size: 14px; font-weight: bold;
+            }
+            QPushButton:hover { background-color: #1557b0; }
+        """)
+        confirm_btn.clicked.connect(self._on_confirm)
+        layout.addWidget(confirm_btn)
+
+        self.setStyleSheet("QDialog { background-color: #202124; }")
+
+    def _on_confirm(self):
+        self.selected_language = "english" if self._radio_en.isChecked() else "spanish"
+        self.accept()
+
+    def get_language(self) -> str:
+        return self.selected_language
+
+
 class MainWindow(QMainWindow):
     """Main application window - Gemini Style"""
     
@@ -1944,12 +2230,12 @@ class MainWindow(QMainWindow):
         
         # Voice preferences
         self.english_voice = self.preferences.get("english_voice", "af_bella")
-        self.spanish_voice = self.preferences.get("spanish_voice", "Daniela")
+        self.spanish_voice = self.preferences.get("spanish_voice", "ef_dora")
         
         # Detect available voices
         from voice_detector import get_english_voices, get_spanish_voices
         self.available_english_voices = get_english_voices()
-        self.available_spanish_voices = list(get_spanish_voices().keys())
+        self.available_spanish_voices = get_spanish_voices()
         
         # Initialize components
         self.output_device = self.preferences.get("output_device", -1)
@@ -1965,8 +2251,7 @@ class MainWindow(QMainWindow):
             current_voice = self.english_voice if self.language == "english" else self.spanish_voice
             self.ai_manager = AIManager(
                 language=self.language,
-                voice_name=self.english_voice,
-                sherpa_voice=self.spanish_voice
+                voice_name=current_voice,
             )
         except Exception as e:
             print(f"Error initializing AI: {e}")
@@ -1992,6 +2277,9 @@ class MainWindow(QMainWindow):
         self.pulse_timer = QTimer()
         self.pulse_timer.timeout.connect(self.update_recording_animation)
         self.pulse_state = 0
+
+        # Voice scanner — runs after the window is fully rendered
+        QTimer.singleShot(300, self._check_voices_on_startup)
     
     def init_ui(self):
         """Initialize the Gemini-inspired UI"""
@@ -2743,13 +3031,41 @@ class MainWindow(QMainWindow):
             self.ai_manager.reset_conversation()
         
         self.add_bot_message("Chat cleared. Tap the mic to start a new conversation!")
-    
+
+    # ── Startup voice scanner ──────────────────────────────────────────────────
+
+    def _check_voices_on_startup(self):
+        """
+        Scan the voices/ folder and show the appropriate dialog:
+          • No voices at all  → VoiceSetupDialog (download instructions)
+          • New unknown folder → NewVoiceClassifierDialog (per unknown folder)
+        """
+        from voice_scanner import scan_voices_folder, save_voice_language
+
+        scan = scan_voices_folder()
+
+        # ── Case 1: no voices found ────────────────────────────────────────
+        if not scan["has_any"]:
+            dlg = VoiceSetupDialog(self)
+            dlg.exec()
+            return
+
+        # ── Case 2: classify every newly-detected Sherpa folder ──────────
+        for voice in scan["sherpa_voices"]:
+            if not voice["is_new"]:
+                continue  # already classified, skip
+
+            dlg = NewVoiceClassifierDialog(voice["folder"], self)
+            if dlg.exec() == QDialog.DialogCode.Accepted:
+                lang = dlg.get_language()
+                save_voice_language(voice["folder"], lang)
+                print(f"✓ Voice pack '{voice['folder']}' classified as: {lang}")
+
     def closeEvent(self, event):
         """Cleanup on close"""
         # Stop Live Mode if active
         if hasattr(self, 'live_mode_widget') and self.live_mode_widget.is_active:
-            self.live_mode_widget.stop_live_mode()
-        
+            self.live_mode_widget.stop_live_mode()        
         if self.recorder_thread and self.recorder_thread.isRunning():
             self.recorder_thread.stop_recording()
             self.recorder_thread.wait()

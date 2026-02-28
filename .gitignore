@@ -55,22 +55,18 @@ user_preferences.json
 # PyCharm
 .idea/
 
-# Voice models and data (large files - too big for GitHub)
-# Keep folder structure but ignore contents
-voices/english/*
-voices/spanish/*
-!voices/english/.gitkeep
-!voices/spanish/.gitkeep
+# ── Voice models (large binary files — download separately) ──────────────────
+# Ignore everything inside voices/ except the .gitkeep placeholder and the
+# user's voice classification config (voices_config.json).
+voices/**
+!voices/kokoro-v1.0/
+!voices/kokoro-v1.0/.gitkeep
+!voices/voices_config.json
 
-# Legacy paths (keeping for backwards compatibility)
-*.onnx
+# Legacy loose .onnx / voices.json files at the repo root (safety net)
 voices.json
 
-# BUT keep these small files
-!models/sherpa-spanish/tokens.txt
-!models/sherpa-spanish/README.md
-
-# espeak-ng data (large, must be downloaded)
+# espeak-ng data bundled inside voice packs (large, downloaded with the pack)
 espeak-ng-data/
 
 # Faster-whisper cache

@@ -10,7 +10,7 @@ import numpy as np
 from faster_whisper import WhisperModel
 import ollama
 
-# Import TTS Manager (handles both Kokoro and Sherpa)
+# Import TTS Manager (Kokoro unified)
 try:
     from tts_manager import TTSManager
     TTS_MANAGER_AVAILABLE = True
@@ -25,29 +25,25 @@ class AIManager:
     def __init__(self, 
                  whisper_model="base",  # Use multilingual by default (not base.en)
                  ollama_model="llama3.1:8b",
-                 kokoro_model_path="voices/english/kokoro-v0_19.onnx",
-                 voices_path="voices/english/voices.json",
+                 kokoro_model_path="voices/kokoro-v1.0/kokoro-v1.0.onnx",
+                 voices_path="voices/kokoro-v1.0/voices-v1.0.bin",
                  voice_name="af_bella",
-                 language="english",
-                 sherpa_model_dir="voices/spanish",
-                 sherpa_voice="vits-piper-es_AR-daniela-high"):
+                 language="english"):
         """
         Initialize all AI models
         
         Args:
             whisper_model: faster-whisper model size (use 'base' for multilingual)
             ollama_model: Ollama model name
-            kokoro_model_path: Path to Kokoro ONNX model
-            voices_path: Path to voices.json
-            voice_name: English voice to use (af_bella, af_sarah, etc.)
+            kokoro_model_path: Path to Kokoro v1.0 ONNX model
+            voices_path: Path to unified voices.json (English + Spanish)
+            voice_name: Voice to use (af_bella, ef_dora, etc.)
             language: Current language ("english" or "spanish")
-            sherpa_model_dir: Base directory for Spanish voices
-            sherpa_voice: Spanish voice name (Daniela, Marta, etc.)
         """
         print("Initializing AI Manager...")
         
         self.language = language
-        self.current_voice = voice_name if language == "english" else sherpa_voice
+        self.current_voice = voice_name
         
         # Check CUDA availability
         try:
@@ -81,8 +77,8 @@ class AIManager:
         print(f"✓ Ollama configured with model: {ollama_model}")
         self.ollama_model = ollama_model
         
-        # Load TTS Manager (handles both Kokoro and Sherpa)
-        print("Loading TTS engines...")
+        # Load TTS Manager (unified Kokoro for all languages)
+        print("Loading TTS engine...")
         
         if TTS_MANAGER_AVAILABLE:
             try:
@@ -90,9 +86,7 @@ class AIManager:
                     language=language,
                     kokoro_model_path=kokoro_model_path,
                     voices_path=voices_path,
-                    kokoro_voice=voice_name,
-                    sherpa_model_dir=sherpa_model_dir,
-                    sherpa_voice_name=sherpa_voice,
+                    voice_name=voice_name,
                 )
                 self.tts_available = self.tts_manager.is_available()
             except Exception as e:
@@ -212,20 +206,15 @@ class AIManager:
     
     def set_voice(self, voice_name: str):
         """
-        Change the current voice (handles both English and Spanish)
+        Change the current voice.
         
         Args:
-            voice_name: Voice name (e.g., "af_bella" for English, "Daniela" for Spanish)
+            voice_name: Voice name (e.g., "af_bella" for English, "ef_dora" for Spanish)
         """
         self.current_voice = voice_name
         
-        if not self.tts_manager:
-            return
-        
-        if self.language == "english":
-            self.tts_manager.set_kokoro_voice(voice_name)
-        elif self.language == "spanish":
-            self.tts_manager.set_sherpa_voice(voice_name)
+        if self.tts_manager:
+            self.tts_manager.set_voice(voice_name)
         
         print(f"🎤 Voice changed to: {voice_name}")
     
@@ -446,8 +435,7 @@ class AIManager:
     
     def text_to_speech(self, text, speed=1.0):
         """
-        Convert text to speech using the appropriate TTS engine
-        (Kokoro for English, Sherpa for Spanish)
+        Convert text to speech using Kokoro TTS
         
         Args:
             text: Text to synthesize

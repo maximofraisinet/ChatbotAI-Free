@@ -1,76 +1,87 @@
 """
 Voice Detection Module
-Automatically detects available voices in voices/english/ and voices/spanish/
+Detects Kokoro (voices/kokoro-v1.0/) and Sherpa-ONNX voices (all other
+subfolders classified via voices/voices_config.json).
 """
 
 import json
 import os
 from pathlib import Path
-from typing import List, Dict
+from typing import List
+
+
+def _get_sherpa_voices_for_language(language: str) -> List[str]:
+    """
+    Return Sherpa voice folder names classified as `language`
+    (read from voices/voices_config.json).
+    """
+    config_path = Path("voices/voices_config.json")
+    if not config_path.exists():
+        return []
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = json.load(f)
+        return [folder for folder, lang in config.items() if lang == language]
+    except Exception:
+        return []
 
 
 def get_english_voices() -> List[str]:
     """
-    Detect available English voices from voices.json
-    
-    Returns:
-        List of voice names (e.g., ['af_bella', 'af_sarah', 'am_adam'])
+    Return available English voices:
+      • Kokoro voices (af_*, am_*) from voices-v1.0.bin
+      • Any Sherpa folder classified as 'english' in voices_config.json
     """
-    voices_json = Path("voices/english/voices.json")
-    
-    if not voices_json.exists():
-        print("⚠️ voices.json not found for English voices")
-        return ["af_bella"]  # Default fallback
-    
-    try:
-        with open(voices_json, 'r') as f:
-            voices_data = json.load(f)
-            # Get all voice keys from the JSON
-            voice_list = list(voices_data.keys())
-            print(f"✓ Detected {len(voice_list)} English voices")
-            return voice_list
-    except Exception as e:
-        print(f"⚠️ Error reading voices.json: {e}")
-        return ["af_bella"]
+    voices_bin = Path("voices/kokoro-v1.0/voices-v1.0.bin")
+    kokoro_voices: List[str] = []
+
+    if voices_bin.exists():
+        try:
+            import numpy as np
+            data = np.load(str(voices_bin), allow_pickle=False)
+            kokoro_voices = [v for v in data.files if v.startswith('a')]
+            if kokoro_voices:
+                print(f"✓ Detected {len(kokoro_voices)} English voices")
+        except Exception as e:
+            print(f"⚠️ Error reading voices-v1.0.bin: {e}")
+    else:
+        print("⚠️ voices-v1.0.bin not found for English voices")
+        kokoro_voices = ["af_bella"]
+
+    sherpa = _get_sherpa_voices_for_language("english")
+    if sherpa:
+        print(f"✓ Detected {len(sherpa)} Sherpa English voice(s): {sherpa}")
+
+    return kokoro_voices + sherpa if kokoro_voices else (["af_bella"] + sherpa)
 
 
-def get_spanish_voices() -> Dict[str, str]:
+def get_spanish_voices() -> List[str]:
     """
-    Detect available Spanish voices by scanning subdirectories in voices/spanish/
-    
-    Returns:
-        Dict with voice name as key and path as value
-        Example: {'Daniela': 'voices/spanish/Daniela', 'Marta': 'voices/spanish/Marta'}
+    Return available Spanish voices:
+      • Kokoro voices (ef_*, em_*) from voices-v1.0.bin
+      • Any Sherpa folder classified as 'spanish' in voices_config.json
     """
-    spanish_dir = Path("voices/spanish")
-    
-    if not spanish_dir.exists():
-        print("⚠️ voices/spanish directory not found")
-        return {}
-    
-    voices = {}
-    
-    try:
-        # Scan for subdirectories
-        for item in spanish_dir.iterdir():
-            if item.is_dir():
-                # Check if directory contains required files
-                onnx_files = list(item.glob("*.onnx"))
-                tokens_file = item / "tokens.txt"
-                
-                if onnx_files and tokens_file.exists():
-                    voice_name = item.name
-                    voices[voice_name] = str(item)
-                    print(f"✓ Detected Spanish voice: {voice_name} ({onnx_files[0].name})")
-        
-        if not voices:
-            print("⚠️ No Spanish voices found in voices/spanish/")
-        
-        return voices
-    
-    except Exception as e:
-        print(f"⚠️ Error scanning Spanish voices: {e}")
-        return {}
+    voices_bin = Path("voices/kokoro-v1.0/voices-v1.0.bin")
+    kokoro_voices: List[str] = []
+
+    if voices_bin.exists():
+        try:
+            import numpy as np
+            data = np.load(str(voices_bin), allow_pickle=False)
+            kokoro_voices = [v for v in data.files if v.startswith('e')]
+            if kokoro_voices:
+                print(f"\u2713 Detected {len(kokoro_voices)} Spanish voices")
+        except Exception as e:
+            print(f"\u26a0\ufe0f Error reading voices-v1.0.bin: {e}")
+    else:
+        print("\u26a0\ufe0f voices-v1.0.bin not found for Spanish voices")
+        kokoro_voices = ["ef_dora"]
+
+    sherpa = _get_sherpa_voices_for_language("spanish")
+    if sherpa:
+        print(f"\u2713 Detected {len(sherpa)} Sherpa Spanish voice(s): {sherpa}")
+
+    return kokoro_voices + sherpa if kokoro_voices else (["ef_dora"] + sherpa)
 
 
 def get_available_voices(language: str) -> List[str]:
@@ -86,8 +97,7 @@ def get_available_voices(language: str) -> List[str]:
     if language == "english":
         return get_english_voices()
     elif language == "spanish":
-        spanish_voices = get_spanish_voices()
-        return list(spanish_voices.keys())
+        return get_spanish_voices()
     else:
         return []
 
@@ -99,5 +109,4 @@ if __name__ == "__main__":
     
     print("\n=== Spanish Voices ===")
     spanish = get_spanish_voices()
-    for name, path in spanish.items():
-        print(f"  {name}: {path}")
+    print(f"Found {len(spanish)} voices: {spanish}")
