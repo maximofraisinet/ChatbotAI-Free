@@ -36,6 +36,7 @@ DEFAULT_PREFERENCES = {
     "output_device": -1,  # Audio output device index (-1 = system default)
     "input_device": -1,  # Audio input device index (-1 = system default)
     "context_size": 0,  # LLM context window in tokens (0 = model default)
+    "whisper_model": "base",  # Whisper STT model size (base, small, medium, large-v3)
 }
 
 FONT_SIZES = {

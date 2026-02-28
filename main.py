@@ -12,7 +12,8 @@ from PyQt6.QtWidgets import (
     QHBoxLayout, QLabel, QScrollArea, QPushButton,
     QComboBox, QFrame, QSpacerItem, QSizePolicy, QTextEdit,
     QDialog, QCheckBox, QStackedWidget, QGraphicsDropShadowEffect,
-    QTextBrowser, QSlider, QRadioButton, QButtonGroup, QSpinBox
+    QTextBrowser, QSlider, QRadioButton, QButtonGroup, QSpinBox,
+    QMessageBox
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, pyqtSlot, QTimer, QPropertyAnimation, QEasingCurve, QRect
 from PyQt6.QtGui import QFont, QColor, QPainter, QPen
@@ -1520,7 +1521,7 @@ class LiveModeWidget(QWidget):
 class SettingsDialog(QDialog):
     """Settings dialog with font size and language options"""
     
-    def __init__(self, parent=None, auto_send=True, font_size="medium", language="english", voice_speed=1.0, output_device=-1, input_device=-1, context_size=0):
+    def __init__(self, parent=None, auto_send=True, font_size="medium", language="english", voice_speed=1.0, output_device=-1, input_device=-1, context_size=0, whisper_model="base"):
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.setMinimumWidth(440)
@@ -1532,6 +1533,7 @@ class SettingsDialog(QDialog):
         self.output_device = output_device
         self.input_device = input_device
         self.context_size = context_size
+        self.whisper_model = whisper_model
 
         # Outer layout: scroll area (contenido) + botón guardar (fijo abajo)
         from PyQt6.QtWidgets import QScrollArea
@@ -1828,6 +1830,41 @@ class SettingsDialog(QDialog):
         mic_help.setStyleSheet("font-size: 11px; color: #9AA0A6; margin-left: 4px;")
         layout.addWidget(mic_help)
 
+        # Separator whisper
+        sep_whisper = QFrame()
+        sep_whisper.setFrameShape(QFrame.Shape.HLine)
+        sep_whisper.setStyleSheet("background-color: #3C4043;")
+        layout.addWidget(sep_whisper)
+
+        # ===== WHISPER MODEL QUALITY =====
+        whisper_label = QLabel("\U0001f3a4 Speech Recognition Quality:")
+        whisper_label.setStyleSheet("font-size: 14px; color: #E3E3E3; margin-top: 10px;")
+        layout.addWidget(whisper_label)
+
+        self._whisper_values = ["base", "small", "medium", "large-v3"]
+        self._whisper_labels = [
+            "Fast (Base - ~1GB VRAM)",
+            "Balanced (Small - ~2GB VRAM)",
+            "High (Medium - ~5GB VRAM)",
+            "Ultra (Large-v3 - ~10GB VRAM)",
+        ]
+        self.whisper_combo = QComboBox()
+        self.whisper_combo.addItems(self._whisper_labels)
+        try:
+            self.whisper_combo.setCurrentIndex(self._whisper_values.index(whisper_model))
+        except ValueError:
+            self.whisper_combo.setCurrentIndex(0)
+        self.whisper_combo.setStyleSheet(combo_style)
+        layout.addWidget(self.whisper_combo)
+
+        whisper_warn = QLabel(
+            "\u26a0\ufe0f Warning: Higher quality models require significantly more "
+            "RAM/VRAM and may slow down your system if running alongside heavy LLMs."
+        )
+        whisper_warn.setWordWrap(True)
+        whisper_warn.setStyleSheet("font-size: 11px; color: #F4B400; margin-left: 4px;")
+        layout.addWidget(whisper_warn)
+
         # Separator 4
         separator4 = QFrame()
         separator4.setFrameShape(QFrame.Shape.HLine)
@@ -1978,6 +2015,9 @@ class SettingsDialog(QDialog):
 
     def get_context_size(self):
         return self.context_spin.value()
+
+    def get_whisper_model(self):
+        return self._whisper_values[self.whisper_combo.currentIndex()]
 
 
 class VoiceSetupDialog(QDialog):
@@ -2294,6 +2334,7 @@ class MainWindow(QMainWindow):
         self.language = self.preferences.get("language", "english")
         self.voice_speed = self.preferences.get("voice_speed", 1.0)
         self.context_size = self.preferences.get("context_size", 0)
+        self.whisper_model = self.preferences.get("whisper_model", "base")
         self.chat_bubbles = []  # Track bubbles for font size updates
         
         # Voice preferences
@@ -2320,6 +2361,7 @@ class MainWindow(QMainWindow):
             self.ai_manager = AIManager(
                 language=self.language,
                 voice_name=current_voice,
+                whisper_model=self.whisper_model,
             )
             if self.context_size > 0:
                 self.ai_manager.num_ctx = self.context_size
@@ -2837,7 +2879,8 @@ class MainWindow(QMainWindow):
     
     def open_settings(self):
         """Open settings dialog"""
-        dialog = SettingsDialog(self, self.auto_send, self.font_size_name, self.language, self.voice_speed, self.output_device, self.input_device, self.context_size)
+        old_whisper_model = self.whisper_model
+        dialog = SettingsDialog(self, self.auto_send, self.font_size_name, self.language, self.voice_speed, self.output_device, self.input_device, self.context_size, self.whisper_model)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.auto_send = dialog.get_auto_send()
             new_font_size = dialog.get_font_size()
@@ -2898,6 +2941,12 @@ class MainWindow(QMainWindow):
                 ctx_display = f"{new_context_size} tokens" if new_context_size > 0 else "model default"
                 print(f"🧠 Context window size changed to: {ctx_display}")
 
+            # Check if whisper model changed (requires restart)
+            new_whisper_model = dialog.get_whisper_model()
+            if new_whisper_model != self.whisper_model:
+                self.whisper_model = new_whisper_model
+                print(f"\U0001f3a4 Whisper model changed to: {new_whisper_model}")
+
             # Save preferences
             self.preferences["auto_send"] = self.auto_send
             self.preferences["font_size"] = self.font_size_name
@@ -2908,7 +2957,47 @@ class MainWindow(QMainWindow):
             self.preferences["output_device"] = self.output_device
             self.preferences["input_device"] = self.input_device
             self.preferences["context_size"] = self.context_size
+            self.preferences["whisper_model"] = self.whisper_model
             save_preferences(self.preferences)
+
+            # Prompt restart if whisper model changed
+            if self.whisper_model != old_whisper_model:
+                msg = QMessageBox(self)
+                msg.setWindowTitle("Restart Required")
+                msg.setIcon(QMessageBox.Icon.Information)
+                msg.setText(
+                    "The speech recognition model has been changed.\n"
+                    "A restart is required for the new model to take effect."
+                )
+                msg.setStyleSheet("""
+                    QMessageBox {
+                        background-color: #202124;
+                    }
+                    QMessageBox QLabel {
+                        color: #E3E3E3;
+                        font-size: 13px;
+                        background-color: transparent;
+                    }
+                    QPushButton {
+                        background-color: #282A2C;
+                        color: #E3E3E3;
+                        border: 1px solid #3C4043;
+                        border-radius: 8px;
+                        padding: 8px 20px;
+                        font-size: 13px;
+                        min-width: 100px;
+                    }
+                    QPushButton:hover {
+                        background-color: #3C4043;
+                    }
+                """)
+                restart_btn = msg.addButton("Restart Now", QMessageBox.ButtonRole.AcceptRole)
+                msg.addButton("Later", QMessageBox.ButtonRole.RejectRole)
+                msg.exec()
+                if msg.clickedButton() == restart_btn:
+                    import os
+                    os.execl(sys.executable, sys.executable, *sys.argv)
+
             
             mode_name = "Auto-send" if self.auto_send else "Manual review"
             lang_display = "English" if self.language == "english" else "Español"
