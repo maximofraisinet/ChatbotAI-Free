@@ -3051,6 +3051,7 @@ class MainWindow(QMainWindow):
             return
 
         # ── Case 2: classify every newly-detected Sherpa folder ──────────
+        newly_classified = False
         for voice in scan["sherpa_voices"]:
             if not voice["is_new"]:
                 continue  # already classified, skip
@@ -3060,6 +3061,14 @@ class MainWindow(QMainWindow):
                 lang = dlg.get_language()
                 save_voice_language(voice["folder"], lang)
                 print(f"✓ Voice pack '{voice['folder']}' classified as: {lang}")
+                newly_classified = True
+
+        # ── Refresh dropdowns if any new voice was classified ─────────────
+        if newly_classified:
+            from voice_detector import get_english_voices, get_spanish_voices
+            self.available_english_voices = get_english_voices()
+            self.available_spanish_voices = get_spanish_voices()
+            self.update_voice_list()
 
     def closeEvent(self, event):
         """Cleanup on close"""
