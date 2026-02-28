@@ -2075,7 +2075,10 @@ class VoiceSetupDialog(QDialog):
         close_btn.clicked.connect(self.accept)
         layout.addWidget(close_btn, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        self.setStyleSheet("QDialog { background-color: #202124; }")
+        self.setStyleSheet("""
+            QDialog { background-color: #202124; }
+            QLabel  { background-color: transparent; }
+        """)
 
     def _open_voices_folder(self):
         import subprocess, os
@@ -2182,7 +2185,7 @@ class NewVoiceClassifierDialog(QDialog):
         layout.addWidget(radio_box)
 
         # ── Confirm button ─────────────────────────────────────────────────
-        confirm_btn = QPushButton("Save & Continue")
+        confirm_btn = QPushButton("Save && Continue")
         confirm_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         confirm_btn.setStyleSheet("""
             QPushButton {
@@ -2195,7 +2198,10 @@ class NewVoiceClassifierDialog(QDialog):
         confirm_btn.clicked.connect(self._on_confirm)
         layout.addWidget(confirm_btn)
 
-        self.setStyleSheet("QDialog { background-color: #202124; }")
+        self.setStyleSheet("""
+            QDialog { background-color: #202124; }
+            QLabel  { background-color: transparent; }
+        """)
 
     def _on_confirm(self):
         self.selected_language = "english" if self._radio_en.isChecked() else "spanish"
