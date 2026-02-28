@@ -37,6 +37,9 @@ https://github.com/user-attachments/assets/c33bd6a7-a4ae-48cf-89c5-c72d019a0d53
   - Streaming responses with simultaneous TTS generation.
   - Persistent conversation history with context-window indicator.
 
+- **📄 PDF Document Chat**
+  Attach a PDF directly into the conversation — the app extracts text, counts tokens, and shows a detailed confirmation dialog with context-window stats before injecting it. Ask questions about the document without any external vector DB or RAG pipeline.
+
 - **🎨 Modern, Customizable UI**
   - Dark theme inspired by Google Gemini.
   - Adjustable voice speed (0.5× – 2.0×), font size, and audio devices.
@@ -56,6 +59,8 @@ https://github.com/user-attachments/assets/c33bd6a7-a4ae-48cf-89c5-c72d019a0d53
 | **Speech-to-Text** | [faster-whisper](https://github.com/guillaumekln/faster-whisper) |
 | **Text-to-Speech (primary)** | [Kokoro ONNX v1.0](https://github.com/thewh1teagle/kokoro-onnx) |
 | **Text-to-Speech (extra voices)** | [Sherpa-ONNX](https://github.com/k2-fsa/sherpa-onnx) (optional) |
+| **PDF Text Extraction** | [PyMuPDF](https://pymupdf.readthedocs.io/) |
+| **Token Counting** | [tiktoken](https://github.com/openai/tiktoken) |
 | **Audio I/O** | sounddevice, NumPy, paplay (PipeWire) |
 
 ---
@@ -170,6 +175,7 @@ On the next launch, the voice scanner detects the new folder and shows a one-tim
 | ⚙️ Settings | Language, voice speed, font size, audio devices, recording mode |
 | 🎤 Mic button | Tap to record; tap again to send (or enable auto-send in Settings) |
 | ✨ Live button | Enter hands-free Live Mode |
+| 📎 Attach button | Upload a PDF document into the conversation context |
 | ⏹ Stop (during playback) | Interrupt the AI mid-response |
 | Context donut (bottom bar) | Click to see context window usage |
 

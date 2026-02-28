@@ -18,5 +18,11 @@ ollama>=0.1.0
 kokoro-onnx>=0.4.0  # Official Kokoro TTS library (v1.0+ for multilingual)
 onnxruntime-gpu>=1.16.0  # Use onnxruntime-gpu for CUDA support
 
+# PDF text extraction
+PyMuPDF>=1.23.0
+
+# Token counting
+tiktoken>=0.5.0
+
 # Note: Markdown rendering is done natively with regex - no additional library needed
 # The MarkdownRenderer class in main.py handles basic markdown formatting

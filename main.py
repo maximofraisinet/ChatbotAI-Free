@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QComboBox, QFrame, QSpacerItem, QSizePolicy, QTextEdit,
     QDialog, QCheckBox, QStackedWidget, QGraphicsDropShadowEffect,
     QTextBrowser, QSlider, QRadioButton, QButtonGroup, QSpinBox,
-    QMessageBox
+    QMessageBox, QFileDialog
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, pyqtSlot, QTimer, QPropertyAnimation, QEasingCurve, QRect
 from PyQt6.QtGui import QFont, QColor, QPainter, QPen
@@ -2527,7 +2527,7 @@ class MainWindow(QMainWindow):
         # Text input row - PRIMERO (crece hacia arriba)
         text_row = QHBoxLayout()
         text_row.setSpacing(10)
-        
+
         # Text input field
         self.text_input = CustomTextEdit()
         self.text_input.setObjectName("textInput")
@@ -2572,7 +2572,29 @@ class MainWindow(QMainWindow):
         self.clear_btn.clicked.connect(self.clear_chat)
         self.clear_btn.setFixedWidth(70)
         button_row.addWidget(self.clear_btn)
-        
+
+        # Attach PDF button (right of Clear)
+        self.attach_btn = QPushButton("\U0001F4CE")
+        self.attach_btn.setObjectName("attachButton")
+        self.attach_btn.setToolTip("Attach a PDF document")
+        self.attach_btn.setFixedSize(42, 42)
+        self.attach_btn.clicked.connect(self.attach_pdf)
+        self.attach_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.attach_btn.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                border: 1px solid #3C4043;
+                border-radius: 21px;
+                font-size: 18px;
+                color: #9AA0A6;
+            }
+            QPushButton:hover {
+                background-color: #3C4043;
+                color: #E3E3E3;
+            }
+        """)
+        button_row.addWidget(self.attach_btn)
+
         # Status label (center-left)
         self.status_label = QLabel("Ready")
         self.status_label.setObjectName("statusLabel")
@@ -3186,6 +3208,270 @@ class MainWindow(QMainWindow):
                 scrollbar.setValue(scrollbar.maximum())
             )
     
+    def attach_pdf(self):
+        """Open a file dialog to attach a PDF and inject its text into the context."""
+        if self.ai_manager is None:
+            self.status_label.setText("AI not loaded!")
+            return
+
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select PDF", "", "PDF Files (*.pdf)"
+        )
+        if not file_path:
+            return
+
+        import os
+        filename = os.path.basename(file_path)
+
+        # ── Show loading overlay ──────────────────────────────────────
+        loading = QDialog(self, Qt.WindowType.FramelessWindowHint)
+        loading.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        loading.setModal(True)
+
+        _shade = QWidget(loading)
+        _shade.setStyleSheet("background-color: rgba(0, 0, 0, 160); border-radius: 16px;")
+
+        _card = QWidget(_shade)
+        _card.setStyleSheet(
+            "background-color: #2A2B2E; border-radius: 16px; padding: 24px;"
+        )
+        _card_lay = QVBoxLayout(_card)
+        _card_lay.setContentsMargins(32, 28, 32, 28)
+        _card_lay.setSpacing(16)
+
+        _spinner_label = QLabel("⏳")
+        _spinner_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        _spinner_label.setStyleSheet("font-size: 36px; background: transparent;")
+        _card_lay.addWidget(_spinner_label)
+
+        _title_label = QLabel("Processing PDF…")
+        _title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        _title_label.setStyleSheet(
+            "font-size: 16px; font-weight: bold; color: #E3E3E3; background: transparent;"
+        )
+        _card_lay.addWidget(_title_label)
+
+        _detail_label = QLabel(f"Extracting text from {filename}")
+        _detail_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        _detail_label.setWordWrap(True)
+        _detail_label.setStyleSheet(
+            "font-size: 12px; color: #9AA0A6; background: transparent;"
+        )
+        _card_lay.addWidget(_detail_label)
+
+        _shade_lay = QVBoxLayout(_shade)
+        _shade_lay.setContentsMargins(0, 0, 0, 0)
+        _shade_lay.addStretch()
+        _shade_lay.addWidget(_card, 0, Qt.AlignmentFlag.AlignCenter)
+        _shade_lay.addStretch()
+
+        _outer_lay = QVBoxLayout(loading)
+        _outer_lay.setContentsMargins(0, 0, 0, 0)
+        _outer_lay.addWidget(_shade)
+
+        loading.resize(self.size())
+        loading.move(self.mapToGlobal(self.rect().topLeft()))
+        loading.show()
+        QApplication.processEvents()
+
+        # ── Extract text ──────────────────────────────────────────────
+        try:
+            import fitz  # PyMuPDF
+            doc = fitz.open(file_path)
+            pages = len(doc)
+            text = ""
+            for page in doc:
+                text += page.get_text()
+            doc.close()
+        except Exception as e:
+            loading.close()
+            QMessageBox.warning(
+                self, "PDF Error",
+                f"Could not extract text from the PDF:\n{e}"
+            )
+            return
+
+        text = text.strip()
+        if not text:
+            loading.close()
+            QMessageBox.warning(
+                self, "Empty PDF",
+                "The selected PDF does not contain any extractable text."
+            )
+            return
+
+        # ── Count tokens ──────────────────────────────────────────────
+        _detail_label.setText("Counting tokens…")
+        QApplication.processEvents()
+
+        try:
+            import tiktoken
+            enc = tiktoken.get_encoding("cl100k_base")
+            pdf_tokens = len(enc.encode(text))
+        except Exception:
+            pdf_tokens = len(text) // 4
+
+        SAFETY_MARGIN = 2000
+        max_ctx = self.ai_manager.get_model_context_size()
+        used = self.ai_manager.last_token_usage.get("total", 0)
+        available = max_ctx - used - SAFETY_MARGIN
+        remaining_after = available - pdf_tokens
+
+        loading.close()
+
+        # ── Build confirmation dialog ─────────────────────────────────
+        confirm = QDialog(self)
+        confirm.setWindowTitle("Attach Document")
+        confirm.setMinimumWidth(480)
+        confirm.setStyleSheet("""
+            QDialog { background-color: #202124; }
+            QLabel  { background-color: transparent; }
+        """)
+
+        lay = QVBoxLayout(confirm)
+        lay.setContentsMargins(28, 24, 28, 20)
+        lay.setSpacing(14)
+
+        # Header
+        hdr = QLabel(f"\U0001F4C4  {filename}")
+        hdr.setStyleSheet("font-size: 17px; font-weight: bold; color: #E3E3E3;")
+        lay.addWidget(hdr)
+
+        sub = QLabel(f"{pages} page{'s' if pages != 1 else ''}  ·  ~{pdf_tokens:,} tokens")
+        sub.setStyleSheet("font-size: 13px; color: #9AA0A6;")
+        lay.addWidget(sub)
+
+        # Separator
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet("background-color: #3C4043;")
+        lay.addWidget(sep)
+
+        # Stats card
+        stats_card = QWidget()
+        stats_card.setStyleSheet(
+            "background-color: #282A2C; border-radius: 12px; padding: 6px;"
+        )
+        stats_lay = QVBoxLayout(stats_card)
+        stats_lay.setContentsMargins(18, 14, 18, 14)
+        stats_lay.setSpacing(10)
+
+        def _stat_row(label_text: str, value_text: str, color: str = "#E3E3E3") -> QHBoxLayout:
+            row = QHBoxLayout()
+            lbl = QLabel(label_text)
+            lbl.setStyleSheet("font-size: 13px; color: #9AA0A6;")
+            val = QLabel(value_text)
+            val.setStyleSheet(f"font-size: 13px; font-weight: bold; color: {color};")
+            val.setAlignment(Qt.AlignmentFlag.AlignRight)
+            row.addWidget(lbl)
+            row.addWidget(val)
+            return row
+
+        stats_lay.addLayout(_stat_row("Context window", f"{max_ctx:,} tokens"))
+        stats_lay.addLayout(_stat_row("Currently used", f"{used:,} tokens"))
+        stats_lay.addLayout(_stat_row("Document size", f"{pdf_tokens:,} tokens", "#8AB4F8"))
+
+        # Remaining after — green if fits, red if not
+        fits = pdf_tokens <= available
+        remain_color = "#81C995" if fits else "#F28B82"
+        remain_val = f"{remaining_after:,} tokens" if fits else "NOT ENOUGH SPACE"
+        stats_lay.addLayout(
+            _stat_row("Remaining after upload", remain_val, remain_color)
+        )
+
+        lay.addWidget(stats_card)
+
+        # Warning / info label
+        if fits:
+            usage_pct = ((used + pdf_tokens) / max_ctx) * 100 if max_ctx else 0
+            if usage_pct > 80:
+                hint = QLabel(
+                    "\u26a0\ufe0f  This will use over 80% of your context window. "
+                    "Long follow-up conversations may get truncated."
+                )
+                hint.setStyleSheet("font-size: 11px; color: #F4B400; margin-top: 2px;")
+            else:
+                hint = QLabel(
+                    "\u2705  The document fits comfortably. "
+                    "You'll have plenty of room for follow-up questions."
+                )
+                hint.setStyleSheet("font-size: 11px; color: #81C995; margin-top: 2px;")
+        else:
+            hint = QLabel(
+                "\u274c  The document is too large for the available context. "
+                "Try a shorter file or clear the chat to free space."
+            )
+            hint.setStyleSheet("font-size: 11px; color: #F28B82; margin-top: 2px;")
+        hint.setWordWrap(True)
+        lay.addWidget(hint)
+
+        lay.addSpacing(6)
+
+        # Buttons
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(12)
+
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #282A2C;
+                color: #E3E3E3;
+                border: 1px solid #3C4043;
+                border-radius: 8px;
+                padding: 10px 28px;
+                font-size: 13px;
+            }
+            QPushButton:hover { background-color: #3C4043; }
+        """)
+        cancel_btn.clicked.connect(confirm.reject)
+
+        upload_btn = QPushButton("Upload to Chat")
+        upload_btn.setEnabled(fits)
+        upload_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #1A73E8;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                padding: 10px 28px;
+                font-size: 13px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #1557b0; }
+            QPushButton:disabled {
+                background-color: #3C4043;
+                color: #5F6368;
+            }
+        """)
+        upload_btn.clicked.connect(confirm.accept)
+
+        btn_row.addStretch()
+        btn_row.addWidget(cancel_btn)
+        btn_row.addWidget(upload_btn)
+        lay.addLayout(btn_row)
+
+        # ── Show dialog and act ───────────────────────────────────────
+        if confirm.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        # Inject into conversation
+        self.ai_manager.inject_document_context(filename, text)
+
+        # Update token tracking
+        new_used = used + pdf_tokens
+        self.ai_manager.last_token_usage["total"] = new_used
+        self.ai_manager.last_token_usage["prompt"] = (
+            self.ai_manager.last_token_usage.get("prompt", 0) + pdf_tokens
+        )
+        self.update_context_donut(new_used, max_ctx)
+
+        self.add_bot_message(
+            f"\U0001F4C4 Document **{filename}** loaded into context "
+            f"({pdf_tokens:,} tokens used). Ask me anything about it!"
+        )
+        self.status_label.setText(f"PDF loaded: {filename}")
+        print(f"\U0001F4C4 PDF '{filename}' injected: {pdf_tokens:,} tokens")
+
     def clear_chat(self):
         """Clear all messages"""
         while self.chat_layout.count() > 1:

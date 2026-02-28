@@ -513,6 +513,29 @@ class AIManager:
             print(f"Could not query model context size: {e}")
             return 4096
 
+    def inject_document_context(self, filename: str, text: str):
+        """Inject the full text of a document into conversation history.
+
+        The content is added as a 'user' message so that the model can
+        reference it when answering follow-up questions.
+        """
+        self.conversation_history.append({
+            "role": "user",
+            "content": (
+                f"I'm sharing the contents of the document '{filename}' with you. "
+                f"Use it as context to answer my following questions:\n\n{text}"
+            ),
+        })
+        # Add a brief assistant ack so the model knows it received it
+        self.conversation_history.append({
+            "role": "assistant",
+            "content": (
+                f"Got it! I've read the document **{filename}**. "
+                "Feel free to ask me anything about it."
+            ),
+        })
+        print(f"📄 Document '{filename}' injected into conversation history")
+
     def reset_conversation(self):
         """Clear conversation history"""
         self.conversation_history = []
