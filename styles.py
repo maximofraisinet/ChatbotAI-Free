@@ -433,6 +433,78 @@ QToolTip {
     font-size: 12px;
     font-family: 'Google Sans', 'Segoe UI', Arial, sans-serif;
 }
+
+/* ===== SIDEBAR (Chat History) ===== */
+QWidget#sidebarWidget {
+    background-color: #1E1F20;
+    border-right: 1px solid #282A2C;
+}
+
+QPushButton#newChatButton {
+    background-color: #303136;
+    color: #E3E3E3;
+    border: 1px solid #3C4043;
+    border-radius: 20px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: bold;
+    text-align: left;
+}
+
+QPushButton#newChatButton:hover {
+    background-color: #3C4043;
+    border-color: #8AB4F8;
+}
+
+QPushButton#hamburgerButton {
+    background-color: transparent;
+    color: #9AA0A6;
+    border: none;
+    border-radius: 20px;
+    font-size: 22px;
+    min-width: 40px;
+    max-width: 40px;
+    min-height: 40px;
+    max-height: 40px;
+}
+
+QPushButton#hamburgerButton:hover {
+    background-color: #282A2C;
+    color: #E3E3E3;
+}
+
+QListWidget#chatListWidget {
+    background-color: transparent;
+    border: none;
+    outline: none;
+    font-size: 13px;
+    color: #E3E3E3;
+}
+
+QListWidget#chatListWidget::item {
+    background-color: transparent;
+    border-radius: 12px;
+    padding: 10px 14px;
+    margin: 2px 6px;
+    color: #C4C7C5;
+}
+
+QListWidget#chatListWidget::item:hover {
+    background-color: #282A2C;
+}
+
+QListWidget#chatListWidget::item:selected {
+    background-color: #303136;
+    color: #E3E3E3;
+}
+
+QLabel#sidebarTitle {
+    color: #9AA0A6;
+    font-size: 11px;
+    font-weight: bold;
+    padding-left: 14px;
+    background-color: transparent;
+}
 """
 
 # For backwards compatibility

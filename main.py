@@ -13,7 +13,8 @@ from PyQt6.QtWidgets import (
     QComboBox, QFrame, QSpacerItem, QSizePolicy, QTextEdit,
     QDialog, QCheckBox, QStackedWidget, QGraphicsDropShadowEffect,
     QTextBrowser, QSlider, QRadioButton, QButtonGroup, QSpinBox,
-    QMessageBox, QFileDialog
+    QMessageBox, QFileDialog, QListWidget, QListWidgetItem,
+    QInputDialog, QMenu
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, pyqtSlot, QTimer, QPropertyAnimation, QEasingCurve, QRect
 from PyQt6.QtGui import QFont, QColor, QPainter, QPen
@@ -21,6 +22,11 @@ from PyQt6.QtGui import QFont, QColor, QPainter, QPen
 from styles import GEMINI_STYLE, COLORS
 from audio_utils import AudioRecorder, AudioPlayer
 from ai_manager import AIManager
+from chat_history import (
+    create_new_chat, save_chat_to_md, load_chat_from_md,
+    list_chats, delete_chat, update_chat_title, rename_chat,
+    generate_chat_title, get_lightest_ollama_model,
+)
 from preferences import load_preferences, save_preferences, get_font_size_config, FONT_SIZES, get_language_config, get_available_languages, LANGUAGES
 import ollama
 
@@ -91,6 +97,26 @@ class ManualRecorderThread(QThread):
     def stop_recording(self):
         """Stop the recording"""
         self.is_recording = False
+
+
+class TitleGeneratorThread(QThread):
+    """Background thread that generates a short chat title using the lightest model."""
+
+    title_ready = pyqtSignal(str, str)  # (chat_id, generated_title)
+
+    def __init__(self, chat_id: str, user_message: str, parent=None):
+        super().__init__(parent)
+        self.chat_id = chat_id
+        self.user_message = user_message
+
+    def run(self):
+        try:
+            model = get_lightest_ollama_model()
+            title = generate_chat_title(self.user_message, model=model)
+            self.title_ready.emit(self.chat_id, title)
+        except Exception as e:
+            print(f"Title generation failed: {e}")
+            self.title_ready.emit(self.chat_id, self.user_message[:30].strip())
 
 
 class WorkerThread(QThread):
@@ -1884,6 +1910,14 @@ class PracticeModeWidget(QWidget):
         desc.setStyleSheet("font-size: 13px; color: #9AA0A6; background: transparent;")
         ip_lay.addWidget(desc)
 
+        beta_warn = QLabel("⚠️  Beta — Speech recognition accuracy may vary. Results are approximate.")
+        beta_warn.setWordWrap(True)
+        beta_warn.setStyleSheet(
+            "font-size: 12px; color: #F4B400; background-color: rgba(244, 180, 0, 0.08); "
+            "border: 1px solid rgba(244, 180, 0, 0.3); border-radius: 8px; padding: 8px 12px;"
+        )
+        ip_lay.addWidget(beta_warn)
+
         self.input_edit = QTextEdit()
         self.input_edit.setPlaceholderText("Paste your practice text here…")
         self.input_edit.setStyleSheet("""
@@ -2916,6 +2950,11 @@ class MainWindow(QMainWindow):
         self.whisper_model = self.preferences.get("whisper_model", "base")
         self.chat_bubbles = []  # Track bubbles for font size updates
         
+        # Chat history state
+        self.current_chat: dict | None = None   # active chat metadata dict
+        self._title_thread: TitleGeneratorThread | None = None
+        self._first_user_message_sent = False   # True after first msg of current chat
+        
         # Voice preferences
         self.english_voice = self.preferences.get("english_voice", "af_bella")
         self.spanish_voice = self.preferences.get("spanish_voice", "ef_dora")
@@ -2969,6 +3008,11 @@ class MainWindow(QMainWindow):
         self.pulse_timer.timeout.connect(self.update_recording_animation)
         self.pulse_state = 0
 
+        # Initialize chat history — new empty chat
+        self.current_chat = create_new_chat()
+        self._first_user_message_sent = False
+        QTimer.singleShot(400, self._refresh_chat_list)
+
         # Voice scanner — runs after the window is fully rendered
         QTimer.singleShot(300, self._check_voices_on_startup)
     
@@ -2988,6 +3032,14 @@ class MainWindow(QMainWindow):
         header_layout = QHBoxLayout(header)
         header_layout.setContentsMargins(20, 15, 20, 15)
         
+        # Hamburger button (toggle sidebar)
+        self.hamburger_btn = QPushButton("☰")
+        self.hamburger_btn.setObjectName("hamburgerButton")
+        self.hamburger_btn.setFixedSize(40, 40)
+        self.hamburger_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.hamburger_btn.clicked.connect(self.toggle_sidebar)
+        header_layout.addWidget(self.hamburger_btn)
+
         # Model Selector (centered)
         header_layout.addStretch()
         
@@ -3091,7 +3143,52 @@ class MainWindow(QMainWindow):
         self.practice_widget.exit_requested.connect(self.exit_practice_mode)
         self.stacked_widget.addWidget(self.practice_widget)  # Page 2: Practice
 
-        main_layout.addWidget(self.stacked_widget, 1)
+        # ===== SIDEBAR + CONTENT AREA (horizontal) =====
+        content_area = QHBoxLayout()
+        content_area.setContentsMargins(0, 0, 0, 0)
+        content_area.setSpacing(0)
+
+        # --- Sidebar ---
+        self.sidebar_widget = QWidget()
+        self.sidebar_widget.setObjectName("sidebarWidget")
+        self.sidebar_widget.setFixedWidth(260)
+        self.sidebar_widget.setVisible(False)  # hidden by default
+
+        sidebar_layout = QVBoxLayout(self.sidebar_widget)
+        sidebar_layout.setContentsMargins(10, 14, 10, 14)
+        sidebar_layout.setSpacing(10)
+
+        # New Chat button
+        self.new_chat_btn = QPushButton("➕  New Chat")
+        self.new_chat_btn.setObjectName("newChatButton")
+        self.new_chat_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.new_chat_btn.clicked.connect(self.new_chat)
+        sidebar_layout.addWidget(self.new_chat_btn)
+
+        # "Recent" label
+        recent_label = QLabel("RECENT")
+        recent_label.setObjectName("sidebarTitle")
+        sidebar_layout.addWidget(recent_label)
+
+        # Chat list
+        self.chat_list = QListWidget()
+        self.chat_list.setObjectName("chatListWidget")
+        self.chat_list.itemClicked.connect(self._on_chat_item_clicked)
+        self.chat_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.chat_list.customContextMenuRequested.connect(self._show_chat_context_menu)
+        sidebar_layout.addWidget(self.chat_list, 1)
+
+        hint_label = QLabel("💡 Right-click for options")
+        hint_label.setStyleSheet(
+            "color: #6B6F76; font-size: 10px; font-style: italic; "
+            "padding: 4px 14px; background: transparent;"
+        )
+        sidebar_layout.addWidget(hint_label)
+
+        content_area.addWidget(self.sidebar_widget)
+        content_area.addWidget(self.stacked_widget, 1)
+
+        main_layout.addLayout(content_area, 1)
         
         # ===== INPUT BAR =====
         # Wrapper to center input bar
@@ -3155,7 +3252,7 @@ class MainWindow(QMainWindow):
         # Clear button (left)
         self.clear_btn = QPushButton("Clear")
         self.clear_btn.setObjectName("clearButton")
-        self.clear_btn.clicked.connect(self.clear_chat)
+        self.clear_btn.clicked.connect(self.new_chat)
         self.clear_btn.setFixedWidth(70)
         button_row.addWidget(self.clear_btn)
 
@@ -3320,6 +3417,10 @@ class MainWindow(QMainWindow):
         self.worker_thread.processing_complete.connect(self.on_processing_complete)
         self.worker_thread.speaking_started.connect(self.on_speaking_started)
         self.worker_thread.start()
+
+        # Chat history: title generation + autosave
+        self._maybe_generate_title(text)
+        self._autosave_chat()
     
     def start_recording(self):
         """Start manual recording"""
@@ -3446,6 +3547,9 @@ class MainWindow(QMainWindow):
         self.worker_thread.processing_complete.connect(self.on_processing_complete)
         self.worker_thread.speaking_started.connect(self.on_speaking_started)
         self.worker_thread.start()
+
+        # Chat history: autosave (title from first transcribed text)
+        self._autosave_chat()
     
     @pyqtSlot()
     def on_processing_complete(self):
@@ -3456,6 +3560,9 @@ class MainWindow(QMainWindow):
         self.send_btn.setEnabled(True)
         self.mic_btn.setText("🎤")
         self.status_label.setText("Ready")
+
+        # Autosave after bot response is added to conversation_history
+        self._autosave_chat()
     
     @pyqtSlot()
     def on_speaking_started(self):
@@ -3754,6 +3861,9 @@ class MainWindow(QMainWindow):
         
         self.chat_layout.insertWidget(self.chat_layout.count() - 1, wrapper)
         self.scroll_to_bottom()
+
+        # Chat history: generate title on the very first user message
+        self._maybe_generate_title(message)
     
     @pyqtSlot(str)
     def add_bot_message(self, message):
@@ -4087,7 +4197,7 @@ class MainWindow(QMainWindow):
         print(f"\U0001F4C4 PDF '{filename}' injected: {pdf_tokens:,} tokens")
 
     def clear_chat(self):
-        """Clear all messages"""
+        """Clear all messages from the screen (does NOT touch history file)."""
         while self.chat_layout.count() > 1:
             item = self.chat_layout.takeAt(0)
             if item.widget():
@@ -4098,8 +4208,182 @@ class MainWindow(QMainWindow):
         
         if self.ai_manager:
             self.ai_manager.reset_conversation()
-        
-        self.add_bot_message("Chat cleared. Tap the mic to start a new conversation!")
+
+    # ══════════════════════════════════════════════════════════════════
+    #  Chat History — Sidebar, Save / Load / New / Autosave
+    # ══════════════════════════════════════════════════════════════════
+
+    def toggle_sidebar(self):
+        """Show / hide the sidebar."""
+        visible = self.sidebar_widget.isVisible()
+        self.sidebar_widget.setVisible(not visible)
+        if not visible:
+            self._refresh_chat_list()
+
+    def _refresh_chat_list(self):
+        """Refresh the QListWidget with saved chats from disk."""
+        self.chat_list.clear()
+        for chat_meta in list_chats():
+            item = QListWidgetItem(chat_meta["title"])
+            item.setData(Qt.ItemDataRole.UserRole, chat_meta["filename"])
+            # Highlight currently open chat
+            if (self.current_chat
+                    and chat_meta["filename"] == self.current_chat["filename"]):
+                item.setSelected(True)
+            self.chat_list.addItem(item)
+
+    def new_chat(self):
+        """Start a brand-new conversation (saves any current chat first)."""
+        # Clear screen
+        self.clear_chat()
+        # Create fresh chat metadata
+        self.current_chat = create_new_chat()
+        self._first_user_message_sent = False
+        # Show welcome
+        self.add_bot_message(self._get_welcome_message())
+        # Refresh sidebar
+        self._refresh_chat_list()
+
+    def _on_chat_item_clicked(self, item: QListWidgetItem):
+        """Load a chat from the sidebar list."""
+        filename = item.data(Qt.ItemDataRole.UserRole)
+        if not filename:
+            return
+        # Don't reload the same chat
+        if self.current_chat and self.current_chat.get("filename") == filename:
+            return
+        self._load_chat(filename)
+
+    def _load_chat(self, filename: str):
+        """Read a .md file, rebuild conversation_history, and repaint bubbles."""
+        chat = load_chat_from_md(filename)
+        if chat is None:
+            return
+
+        # Clear screen
+        self.clear_chat()
+
+        # Restore conversation history in AIManager
+        self.current_chat = chat
+        self._first_user_message_sent = True  # title already exists
+        if self.ai_manager:
+            self.ai_manager.conversation_history = list(chat["messages"])
+
+        # Repaint all bubbles
+        for msg in chat["messages"]:
+            if msg["role"] == "user":
+                self.add_user_message(msg["content"])
+            else:
+                self.add_bot_message(msg["content"])
+
+        self._refresh_chat_list()
+
+    def _autosave_chat(self):
+        """Silently save the current chat to its .md file."""
+        if self.current_chat is None:
+            self.current_chat = create_new_chat()
+            self._first_user_message_sent = False
+
+        # Sync messages from AIManager
+        if self.ai_manager:
+            self.current_chat["messages"] = list(
+                self.ai_manager.conversation_history
+            )
+        save_chat_to_md(self.current_chat)
+
+    def _maybe_generate_title(self, user_message: str):
+        """If this is the first user message in the chat, generate a title async."""
+        if self._first_user_message_sent:
+            return
+        self._first_user_message_sent = True
+
+        chat_id = self.current_chat["id"] if self.current_chat else ""
+        self._title_thread = TitleGeneratorThread(chat_id, user_message, self)
+        self._title_thread.title_ready.connect(self._on_title_generated)
+        self._title_thread.start()
+
+    @pyqtSlot(str, str)
+    def _on_title_generated(self, chat_id: str, title: str):
+        """Callback when the title generator thread finishes."""
+        if self.current_chat and self.current_chat["id"] == chat_id:
+            update_chat_title(self.current_chat, title)
+            self._refresh_chat_list()
+
+    # ── Context menu (right-click) on chat list items ─────────────────────
+
+    def _show_chat_context_menu(self, pos):
+        """Show rename / delete context menu on right-click."""
+        item = self.chat_list.itemAt(pos)
+        if item is None:
+            return
+        filename = item.data(Qt.ItemDataRole.UserRole)
+        if not filename:
+            return
+
+        menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu {
+                background-color: #282A2C;
+                color: #E3E3E3;
+                border: 1px solid #3C4043;
+                border-radius: 8px;
+                padding: 4px;
+            }
+            QMenu::item {
+                padding: 8px 24px;
+                border-radius: 4px;
+            }
+            QMenu::item:selected {
+                background-color: #3C4043;
+            }
+        """)
+        rename_action = menu.addAction("✏️  Rename")
+        delete_action = menu.addAction("🗑️  Delete")
+
+        action = menu.exec(self.chat_list.mapToGlobal(pos))
+        if action == rename_action:
+            self._rename_chat(item, filename)
+        elif action == delete_action:
+            self._delete_chat(item, filename)
+
+    def _rename_chat(self, item: QListWidgetItem, filename: str):
+        """Prompt user for a new name and update the .md file."""
+        old_title = item.text()
+        new_title, ok = QInputDialog.getText(
+            self, "Rename Chat", "New title:",
+            text=old_title,
+        )
+        if not ok or not new_title.strip():
+            return
+        new_title = new_title.strip()
+
+        # Update on disk
+        rename_chat(filename, new_title)
+
+        # If it's the current chat, update in-memory too
+        if self.current_chat and self.current_chat.get("filename") == filename:
+            self.current_chat["title"] = new_title
+
+        self._refresh_chat_list()
+
+    def _delete_chat(self, item: QListWidgetItem, filename: str):
+        """Confirm and delete a chat .md file."""
+        reply = QMessageBox.question(
+            self, "Delete Chat",
+            f"Delete \u201c{item.text()}\u201d? This cannot be undone.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        delete_chat(filename)
+
+        # If we just deleted the active chat, start a fresh one
+        if self.current_chat and self.current_chat.get("filename") == filename:
+            self.new_chat()
+        else:
+            self._refresh_chat_list()
 
     # ── Startup voice scanner ──────────────────────────────────────────────────
 
