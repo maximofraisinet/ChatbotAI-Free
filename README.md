@@ -32,6 +32,9 @@ https://github.com/user-attachments/assets/c33bd6a7-a4ae-48cf-89c5-c72d019a0d53
   - Voice Activity Detection (VAD) for precise end-of-speech detection.
   - PipeWire-native audio playback — TTS never blocks other apps.
 
+- **💬 Chat History & Sidebar**
+  Conversations are auto-saved as Markdown files. A collapsible sidebar (☰) shows your recent chats — click to resume any conversation. Chat titles are generated automatically by the lightest available Ollama model. Right-click any chat to **rename** or **delete** it.
+
 - **🧠 Fully Local & Private**
   - LLM inference via [Ollama](https://ollama.ai/) — Llama, Mistral, Gemma, and any model you pull.
   - Streaming responses with simultaneous TTS generation.
@@ -178,6 +181,9 @@ On the next launch, the voice scanner detects the new folder and shows a one-tim
 | Control | Action |
 |---|---|
 | Top dropdowns | Select LLM model and active voice |
+| ☰ Hamburger button | Toggle the chat-history sidebar |
+| ➕ New Chat | Start a fresh conversation (sidebar) |
+| Right-click a chat | Rename or delete a saved conversation |
 | ⚙️ Settings | Language, voice speed, font size, audio devices, recording mode |
 | 🎤 Mic button | Tap to record; tap again to send (or enable auto-send in Settings) |
 | ✨ Live button | Enter hands-free Live Mode |
