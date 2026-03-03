@@ -128,7 +128,12 @@ python main.py
 
 On first launch the voice scanner checks `voices/`. If the Kokoro files are in place you're ready to go immediately.
 
----
+
+- **⚡ Lightweight Mode (Low-resource)**
+  - Disable voice generation in `Settings` to skip Kokoro TTS and keep the app text-only (great for netbooks and low-RAM systems).
+  - Optionally disable "Auto-generate chat titles" to avoid extra Ollama calls and save CPU/network on limited machines.
+  - When TTS is disabled a small red indicator appears next to the voice selector (`Voice off`) so you always know the state.
+  - The app is responsive: it detects screen size on startup and uses 10% side margins for chat/input so it works on small screens.
 
 ## 🌍 Adding More Voices (Sherpa-ONNX)
 
@@ -193,6 +198,18 @@ On the next launch, the voice scanner detects the new folder and shows a one-tim
 | Context donut (bottom bar) | Click to see context window usage |
 
 ---
+
+## 💡 Low-resource & Responsive Tips
+
+- **Disable TTS**: Open `Settings` → `Voice Generation (TTS)` and uncheck the box to skip audio generation. The AI will still produce text responses and you can interrupt it at any time. This saves significant CPU/RAM on low-end machines.
+
+- **Disable AI-generated chat titles**: In `Settings` uncheck "Auto-generate chat titles" to avoid extra Ollama calls. Chats will keep a timestamp-based name instead.
+
+- **Choose a smaller Whisper model**: In `Settings` select `base` or `small` for faster, lower-memory STT.
+
+- **Run CPU-only**: If you don't have an NVIDIA GPU, install CPU runtimes (e.g., `onnxruntime`/`onnxruntime-cpu`) and don't install the GPU packages; the app will run Whisper and Kokoro on CPU (may be slower but avoids CUDA errors).
+
+- **Netbook-friendly UI**: The app now detects your screen and uses 10% horizontal margins for chat and input; minimum window size is reduced to 720×520 so it fits small screens.
 
 ## 🤝 Contributing
 
