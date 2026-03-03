@@ -54,9 +54,9 @@ class AIManager:
             self._device = "cuda" if cuda_available else "cpu"
             self._compute_type = "float16" if cuda_available else "int8"
         except ImportError:
-            print("PyTorch not found, assuming CUDA available")
-            self._device = "cuda"
-            self._compute_type = "float16"
+            print("PyTorch not found, defaulting to CPU")
+            self._device = "cpu"
+            self._compute_type = "int8"
         
         # IMPORTANT: Always use multilingual model for multi-language support
         # Remove .en suffix if present - the .en models ONLY understand English
