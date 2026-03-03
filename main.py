@@ -131,7 +131,7 @@ class WorkerThread(QThread):
     speaking_started = pyqtSignal()  # Signal when TTS starts playing
     context_usage_updated = pyqtSignal(int, int)  # (used_tokens, model_ctx_size)
     
-    def __init__(self, ai_manager, audio_player, voice_speed=1.0):
+    def __init__(self, ai_manager, audio_player, voice_speed=1.0, tts_enabled=True):
         super().__init__()
         self.ai_manager = ai_manager
         self.audio_player = audio_player
@@ -139,6 +139,7 @@ class WorkerThread(QThread):
         self.text_input = None  # For text messages
         self.interrupted = False
         self.voice_speed = voice_speed
+        self.tts_enabled = tts_enabled
     
     def set_audio(self, audio_data):
         """Set audio data to process"""
@@ -198,7 +199,8 @@ class WorkerThread(QThread):
         # Track the full response for history
         full_response = [""]
         bot_bubble_created = [False]
-        
+        stop_signal_emitted = [False]  # Track if speaking_started was emitted (TTS-off path)
+
         def on_thinking_chunk(thinking_so_far):
             """Called for each thinking token - update thinking panel"""
             if self.interrupted:
@@ -214,7 +216,13 @@ class WorkerThread(QThread):
             if self.interrupted:
                 return
             full_response[0] = text_so_far
-            
+
+            # When TTS is off the speaking_started signal is never emitted by the
+            # audio path, so emit it on the very first token so the UI shows ⏹️.
+            if not self.tts_enabled and not stop_signal_emitted[0]:
+                self.speaking_started.emit()
+                stop_signal_emitted[0] = True
+
             # Create or update the bot bubble
             if not bot_bubble_created[0]:
                 self.bot_message.emit(text_so_far)
@@ -265,37 +273,43 @@ class WorkerThread(QThread):
             
             tts_complete.set()
         
-        # Start LLM and TTS threads
+        # Start LLM thread (always)
         llm_thread = threading.Thread(target=stream_llm, daemon=True)
-        tts_thread = threading.Thread(target=generate_tts, daemon=True)
-        
         llm_thread.start()
-        tts_thread.start()
-        
-        # Wait for first audio to be ready, then start playing
-        first_audio_ready.wait(timeout=30)  # Max 30 seconds for first response
-        
-        if not self.interrupted:
-            self.status_changed.emit("Speaking...")
-            self.speaking_started.emit()
-        
-        # Play audio chunks as they become available
-        while not (tts_complete.is_set() and audio_queue.empty()):
-            if self.interrupted:
-                break
-            
-            try:
-                audio_output, sample_rate = audio_queue.get(timeout=0.3)
-                if not self.interrupted:
-                    self.audio_player.play(audio_output, sample_rate)
-            except queue.Empty:
-                if tts_complete.is_set():
+
+        if self.tts_enabled:
+            # Start TTS + audio playback pipeline
+            tts_thread = threading.Thread(target=generate_tts, daemon=True)
+            tts_thread.start()
+
+            # Wait for first audio to be ready, then start playing
+            first_audio_ready.wait(timeout=30)  # Max 30 seconds for first response
+
+            if not self.interrupted:
+                self.status_changed.emit("Speaking...")
+                self.speaking_started.emit()
+
+            # Play audio chunks as they become available
+            while not (tts_complete.is_set() and audio_queue.empty()):
+                if self.interrupted:
                     break
-                continue
-        
-        # Wait for threads to finish
+                try:
+                    audio_output, sample_rate = audio_queue.get(timeout=0.3)
+                    if not self.interrupted:
+                        self.audio_player.play(audio_output, sample_rate)
+                except queue.Empty:
+                    if tts_complete.is_set():
+                        break
+                    continue
+
+            tts_thread.join(timeout=1.0)
+        else:
+            # TTS disabled — wait for LLM, but honour interrupt() calls
+            while not self.interrupted and not llm_complete.wait(timeout=0.1):
+                pass
+
+        # Wait for LLM thread to finish
         llm_thread.join(timeout=1.0)
-        tts_thread.join(timeout=1.0)
         
         self.status_changed.emit("Ready")
         # Emit context usage for the donut indicator
@@ -2134,7 +2148,7 @@ class PracticeModeWidget(QWidget):
 class SettingsDialog(QDialog):
     """Settings dialog with font size and language options"""
     
-    def __init__(self, parent=None, auto_send=True, font_size="medium", language="english", voice_speed=1.0, output_device=-1, input_device=-1, context_size=0, whisper_model="base"):
+    def __init__(self, parent=None, auto_send=True, font_size="medium", language="english", voice_speed=1.0, output_device=-1, input_device=-1, context_size=0, whisper_model="base", tts_enabled=True):
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.setMinimumWidth(440)
@@ -2147,6 +2161,7 @@ class SettingsDialog(QDialog):
         self.input_device = input_device
         self.context_size = context_size
         self.whisper_model = whisper_model
+        self.tts_enabled = tts_enabled
 
         # Outer layout: scroll area (contenido) + botón guardar (fijo abajo)
         from PyQt6.QtWidgets import QScrollArea
@@ -2345,6 +2360,32 @@ class SettingsDialog(QDialog):
         speed_help.setWordWrap(True)
         speed_help.setStyleSheet("font-size: 11px; color: #9AA0A6; margin-left: 4px;")
         layout.addWidget(speed_help)
+
+        # TTS enabled toggle
+        sep_tts = QFrame()
+        sep_tts.setFrameShape(QFrame.Shape.HLine)
+        sep_tts.setStyleSheet("background-color: #3C4043;")
+        layout.addWidget(sep_tts)
+
+        tts_label = QLabel("🔇 Voice Generation (TTS):")
+        tts_label.setStyleSheet("font-size: 14px; color: #E3E3E3; margin-top: 10px;")
+        layout.addWidget(tts_label)
+
+        self.tts_checkbox = QCheckBox("Enable voice — the AI will speak its responses")
+        self.tts_checkbox.setChecked(tts_enabled)
+        self.tts_checkbox.setStyleSheet("""
+            QCheckBox { font-size: 13px; color: #E3E3E3; spacing: 8px; }
+            QCheckBox::indicator { width: 18px; height: 18px; border-radius: 4px;
+                border: 2px solid #5F6368; background-color: #282A2C; }
+            QCheckBox::indicator:checked { background-color: #1A73E8; border-color: #1A73E8; }
+            QCheckBox::indicator:hover { border-color: #8AB4F8; }
+        """)
+        layout.addWidget(self.tts_checkbox)
+
+        tts_help = QLabel("Disable to skip Kokoro TTS — useful on low-end hardware.")
+        tts_help.setWordWrap(True)
+        tts_help.setStyleSheet("font-size: 11px; color: #9AA0A6; margin-left: 4px;")
+        layout.addWidget(tts_help)
 
         # Separator audio device
         sep_dev = QFrame()
@@ -2631,6 +2672,9 @@ class SettingsDialog(QDialog):
 
     def get_whisper_model(self):
         return self._whisper_values[self.whisper_combo.currentIndex()]
+
+    def get_tts_enabled(self):
+        return self.tts_checkbox.isChecked()
 
 
 class VoiceSetupDialog(QDialog):
@@ -2956,6 +3000,7 @@ class MainWindow(QMainWindow):
         self.voice_speed = self.preferences.get("voice_speed", 1.0)
         self.context_size = self.preferences.get("context_size", 0)
         self.whisper_model = self.preferences.get("whisper_model", "base")
+        self.tts_enabled = self.preferences.get("tts_enabled", True)
         self.chat_bubbles = []  # Track bubbles for font size updates
         
         # Chat history state
@@ -3420,7 +3465,7 @@ class MainWindow(QMainWindow):
         self.status_label.setText("Processing...")
         
         # Start worker thread with text
-        self.worker_thread = WorkerThread(self.ai_manager, self.player, self.voice_speed)
+        self.worker_thread = WorkerThread(self.ai_manager, self.player, self.voice_speed, self.tts_enabled)
         self.worker_thread.set_text(text)
         self.worker_thread.status_changed.connect(self.update_status)
         self.worker_thread.user_message.connect(self.add_user_message)
@@ -3550,7 +3595,7 @@ class MainWindow(QMainWindow):
         self.status_label.setText("Processing...")
         
         # Start worker thread
-        self.worker_thread = WorkerThread(self.ai_manager, self.player, self.voice_speed)
+        self.worker_thread = WorkerThread(self.ai_manager, self.player, self.voice_speed, self.tts_enabled)
         self.worker_thread.set_audio(audio_data)
         self.worker_thread.status_changed.connect(self.update_status)
         self.worker_thread.user_message.connect(self.add_user_message)
@@ -3637,7 +3682,7 @@ class MainWindow(QMainWindow):
     def open_settings(self):
         """Open settings dialog"""
         old_whisper_model = self.whisper_model
-        dialog = SettingsDialog(self, self.auto_send, self.font_size_name, self.language, self.voice_speed, self.output_device, self.input_device, self.context_size, self.whisper_model)
+        dialog = SettingsDialog(self, self.auto_send, self.font_size_name, self.language, self.voice_speed, self.output_device, self.input_device, self.context_size, self.whisper_model, self.tts_enabled)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.auto_send = dialog.get_auto_send()
             new_font_size = dialog.get_font_size()
@@ -3704,6 +3749,9 @@ class MainWindow(QMainWindow):
                 self.whisper_model = new_whisper_model
                 print(f"\U0001f3a4 Whisper model changed to: {new_whisper_model}")
 
+            # Update TTS enabled
+            self.tts_enabled = dialog.get_tts_enabled()
+
             # Save preferences
             self.preferences["auto_send"] = self.auto_send
             self.preferences["font_size"] = self.font_size_name
@@ -3715,6 +3763,7 @@ class MainWindow(QMainWindow):
             self.preferences["input_device"] = self.input_device
             self.preferences["context_size"] = self.context_size
             self.preferences["whisper_model"] = self.whisper_model
+            self.preferences["tts_enabled"] = self.tts_enabled
             save_preferences(self.preferences)
 
             # Prompt restart if whisper model changed
