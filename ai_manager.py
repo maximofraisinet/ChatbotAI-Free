@@ -536,7 +536,14 @@ class AIManager:
         })
         print(f"📄 Document '{filename}' injected into conversation history")
 
-    def reset_conversation(self):
-        """Clear conversation history"""
+    def reset_conversation(self, system_prompt: str | None = None):
+        """Clear conversation history, optionally injecting a system prompt."""
         self.conversation_history = []
-        print("Conversation history cleared")
+        if system_prompt and system_prompt.strip():
+            self.conversation_history.append({
+                "role": "system",
+                "content": system_prompt.strip(),
+            })
+            print(f"🎭 System prompt injected ({len(system_prompt)} chars)")
+        else:
+            print("Conversation history cleared")

@@ -27,6 +27,7 @@ from chat_history import (
     list_chats, delete_chat, update_chat_title, rename_chat,
     generate_chat_title, get_lightest_ollama_model,
 )
+from characters import load_characters, ensure_characters_dir
 from preferences import load_preferences, save_preferences, get_font_size_config, FONT_SIZES, get_language_config, get_available_languages, LANGUAGES
 import ollama
 
@@ -3033,6 +3034,10 @@ class MainWindow(QMainWindow):
         self.tts_enabled = self.preferences.get("tts_enabled", True)
         self.ai_titles_enabled = self.preferences.get("ai_titles_enabled", True)
         self.chat_bubbles = []  # Track bubbles for font size updates
+
+        # Characters / Personas
+        ensure_characters_dir()
+        self._characters_map: dict[str, str | None] = {}
         
         # Chat history state
         self.current_chat: dict | None = None   # active chat metadata dict
@@ -3162,6 +3167,19 @@ class MainWindow(QMainWindow):
         self.update_voice_list()  # Populate based on current language
         self.voice_selector.currentTextChanged.connect(self.on_voice_changed)
         header_layout.addWidget(self.voice_selector)
+
+        # Character / Persona selector
+        header_layout.addSpacing(16)
+        char_icon = QLabel("🎭")
+        char_icon.setStyleSheet("font-size: 17px; color: #9AA0A6; background: transparent;")
+        header_layout.addWidget(char_icon)
+
+        self.character_selector = QComboBox()
+        self.character_selector.setObjectName("characterSelector")
+        self.character_selector.setMinimumWidth(150)
+        self._load_character_selector()   # populate without signal
+        self.character_selector.currentTextChanged.connect(self.on_character_changed)
+        header_layout.addWidget(self.character_selector)
 
         # Indicator shown when TTS is disabled
         self.tts_off_label = QLabel("🔇 Voice off")
@@ -3895,7 +3913,34 @@ class MainWindow(QMainWindow):
         save_preferences(self.preferences)
         
         print(f"🎤 Voice changed to: {voice_name}")
-    
+
+    # ------------------------------------------------------------------ #
+    #  Characters / Personas                                               #
+    # ------------------------------------------------------------------ #
+    def _load_character_selector(self):
+        """Populate the character ComboBox without firing on_character_changed."""
+        self.character_selector.blockSignals(True)
+        self.character_selector.clear()
+        self._characters_map = {}
+
+        # Default: plain assistant (no system prompt)
+        self.character_selector.addItem("🤖 Assistant")
+        self._characters_map["🤖 Assistant"] = None
+
+        for char in load_characters():
+            display = char["name"]
+            self.character_selector.addItem(display)
+            self._characters_map[display] = char.get("system_prompt", "")
+
+        self.character_selector.blockSignals(False)
+
+    def on_character_changed(self, name: str):
+        """Start a fresh chat when the user picks a different persona."""
+        if not name:
+            return
+        print(f"🎭 Character changed to: {name}")
+        self.new_chat()
+
     def _get_language_change_message(self, language):
         """Get language change notification message"""
         if language == "spanish":
@@ -4343,8 +4388,13 @@ class MainWindow(QMainWindow):
 
     def new_chat(self):
         """Start a brand-new conversation (saves any current chat first)."""
-        # Clear screen
+        # Clear screen + base history reset
         self.clear_chat()
+        # Inject selected character's system prompt (if any)
+        if self.ai_manager and hasattr(self, 'character_selector'):
+            char_name = self.character_selector.currentText()
+            system_prompt = self._characters_map.get(char_name)
+            self.ai_manager.reset_conversation(system_prompt)
         # Create fresh chat metadata
         self.current_chat = create_new_chat()
         self._first_user_message_sent = False

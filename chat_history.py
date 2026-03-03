@@ -110,6 +110,8 @@ def save_chat_to_md(chat: dict):
     for msg in chat["messages"]:
         role = msg["role"]
         content = msg["content"]
+        if role == "system":
+            continue  # never expose system prompts in the saved history
         if role == "user":
             lines.append("### 👤 User")
         else:

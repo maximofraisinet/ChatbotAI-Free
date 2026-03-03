@@ -1,118 +1,45 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
+# ============================================================
+#  WHITELIST — ignore everything, allow only what's listed.
+#  Any new file or folder you create will be ignored by default.
+#  To start tracking something new, add it explicitly below.
+# ============================================================
 
-# C extensions
-*.so
+# Ignore everything at the root
+*
 
-# Distribution / packaging
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+# ── Core source files ────────────────────────────────────────
+!.gitignore
+!LICENSE
+!README.md
+!requirements.txt
 
-# PyInstaller
-*.manifest
-*.spec
+!ai_manager.py
+!audio_utils.py
+!characters.py
+!chat_history.py
+!kokoro_wrapper.py
+!main.py
+!preferences.py
+!sherpa_wrapper.py
+!styles.py
+!test_kokoro.py
+!tts_manager.py
+!voice_detector.py
+!voice_scanner.py
 
-# Virtual Environments
-venv/
-env/
-ENV/
-env.bak/
-venv.bak/
-.venv/
-
-# IDEs
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# User preferences
-user_preferences.json
-
-# PyCharm
-.idea/
-
-# ── Voice models (large binary files — download separately) ──────────────────
-# Ignore everything inside voices/ except the .gitkeep placeholder and the
-# user's voice classification config (voices_config.json).
-voices/**
+# ── voices/ — only the placeholder; all model binaries stay local ──
+!voices/
+voices/*
 !voices/kokoro-v1.0/
+voices/kokoro-v1.0/*
 !voices/kokoro-v1.0/.gitkeep
-voices/voices_config.json
 
-# Legacy loose .onnx / voices.json files at the repo root (safety net)
-voices.json
-
-# espeak-ng data bundled inside voice packs (large, downloaded with the pack)
-espeak-ng-data/
-
-# Faster-whisper cache
-~/.cache/huggingface/
-.cache/
-
-# Audio files (recordings, temporary files)
-*.wav
-*.mp3
-*.flac
-recordings/
-temp_audio/
-
-# Logs
-*.log
-logs/
-
-# pytest
-.pytest_cache/
-.coverage
-htmlcov/
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# pytype static type analyzer
-.pytype/
-
-# Cython debug symbols
-cython_debug/
-
-# Environment variables
-.env
-.env.local
-
-# OS specific
-Thumbs.db
-Desktop.ini
-
-# Test files
-test_output/
-
-# Chat history (user data)
-chats/
+# ── characters/ — include sample files; ignore any new ones you create ──
+!characters/
+characters/*
+!characters/en_job_interviewer.json
+!characters/en_english_teacher.json
+!characters/en_casual_friend.json
+!characters/es_entrevistador.json
+!characters/es_amigo_casual.json
+!characters/es_profesor_ingles.json

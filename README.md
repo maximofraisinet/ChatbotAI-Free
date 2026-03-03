@@ -57,6 +57,9 @@ https://github.com/user-attachments/assets/c33bd6a7-a4ae-48cf-89c5-c72d019a0d53
 - **🔍 Smart Voice Scanner**
   On startup the app scans the `voices/` folder. New voice packs are detected automatically — you'll be prompted once to classify each one by language. No manual config needed.
 
+- **🎭 Characters & Personas**
+  Switch the AI's personality from the **🎭 selector** in the header. Six sample personas ship out of the box (Job Interviewer, English Teacher, Casual Friend — in English and Spanish). Each persona is a plain JSON file in the `characters/` folder — edit the existing ones or add your own with any system prompt. Changing the persona automatically starts a fresh conversation with the new system prompt injected invisibly (not shown in saved history).
+
 ---
 
 ## 🛠️ Technology Stack
@@ -186,6 +189,7 @@ On the next launch, the voice scanner detects the new folder and shows a one-tim
 | Control | Action |
 |---|---|
 | Top dropdowns | Select LLM model and active voice |
+| 🎭 Character selector | Switch the AI persona (header); opens a fresh chat with the new system prompt |
 | ☰ Hamburger button | Toggle the chat-history sidebar |
 | ➕ New Chat | Start a fresh conversation (sidebar) |
 | Right-click a chat | Rename or delete a saved conversation |
