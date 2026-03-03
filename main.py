@@ -3131,7 +3131,17 @@ class MainWindow(QMainWindow):
         self.update_voice_list()  # Populate based on current language
         self.voice_selector.currentTextChanged.connect(self.on_voice_changed)
         header_layout.addWidget(self.voice_selector)
-        
+
+        # Indicator shown when TTS is disabled
+        self.tts_off_label = QLabel("🔇 Voice off")
+        self.tts_off_label.setStyleSheet(
+            "font-size: 11px; font-weight: bold; color: #FF5252; "
+            "background: rgba(255,82,82,0.12); border: 1px solid rgba(255,82,82,0.4); "
+            "border-radius: 6px; padding: 2px 8px;"
+        )
+        self.tts_off_label.setVisible(not self.tts_enabled)
+        header_layout.addWidget(self.tts_off_label)
+
         header_layout.addStretch()
         
         # Settings button (top right)
@@ -3751,6 +3761,7 @@ class MainWindow(QMainWindow):
 
             # Update TTS enabled
             self.tts_enabled = dialog.get_tts_enabled()
+            self.tts_off_label.setVisible(not self.tts_enabled)
 
             # Save preferences
             self.preferences["auto_send"] = self.auto_send
