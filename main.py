@@ -2148,7 +2148,7 @@ class PracticeModeWidget(QWidget):
 class SettingsDialog(QDialog):
     """Settings dialog with font size and language options"""
     
-    def __init__(self, parent=None, auto_send=True, font_size="medium", language="english", voice_speed=1.0, output_device=-1, input_device=-1, context_size=0, whisper_model="base", tts_enabled=True):
+    def __init__(self, parent=None, auto_send=True, font_size="medium", language="english", voice_speed=1.0, output_device=-1, input_device=-1, context_size=0, whisper_model="base", tts_enabled=True, ai_titles_enabled=True):
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.setMinimumWidth(440)
@@ -2162,6 +2162,7 @@ class SettingsDialog(QDialog):
         self.context_size = context_size
         self.whisper_model = whisper_model
         self.tts_enabled = tts_enabled
+        self.ai_titles_enabled = ai_titles_enabled
 
         # Outer layout: scroll area (contenido) + botón guardar (fijo abajo)
         from PyQt6.QtWidgets import QScrollArea
@@ -2386,6 +2387,32 @@ class SettingsDialog(QDialog):
         tts_help.setWordWrap(True)
         tts_help.setStyleSheet("font-size: 11px; color: #9AA0A6; margin-left: 4px;")
         layout.addWidget(tts_help)
+
+        # AI chat titles toggle
+        sep_titles = QFrame()
+        sep_titles.setFrameShape(QFrame.Shape.HLine)
+        sep_titles.setStyleSheet("background-color: #3C4043;")
+        layout.addWidget(sep_titles)
+
+        titles_label = QLabel("💬 AI Chat Titles:")
+        titles_label.setStyleSheet("font-size: 14px; color: #E3E3E3; margin-top: 10px;")
+        layout.addWidget(titles_label)
+
+        self.ai_titles_checkbox = QCheckBox("Auto-generate chat titles using AI")
+        self.ai_titles_checkbox.setChecked(ai_titles_enabled)
+        self.ai_titles_checkbox.setStyleSheet("""
+            QCheckBox { font-size: 13px; color: #E3E3E3; spacing: 8px; }
+            QCheckBox::indicator { width: 18px; height: 18px; border-radius: 4px;
+                border: 2px solid #5F6368; background-color: #282A2C; }
+            QCheckBox::indicator:checked { background-color: #1A73E8; border-color: #1A73E8; }
+            QCheckBox::indicator:hover { border-color: #8AB4F8; }
+        """)
+        layout.addWidget(self.ai_titles_checkbox)
+
+        titles_help = QLabel("Disable to avoid extra Ollama calls — chats will keep their default name.")
+        titles_help.setWordWrap(True)
+        titles_help.setStyleSheet("font-size: 11px; color: #9AA0A6; margin-left: 4px;")
+        layout.addWidget(titles_help)
 
         # Separator audio device
         sep_dev = QFrame()
@@ -2675,6 +2702,9 @@ class SettingsDialog(QDialog):
 
     def get_tts_enabled(self):
         return self.tts_checkbox.isChecked()
+
+    def get_ai_titles_enabled(self):
+        return self.ai_titles_checkbox.isChecked()
 
 
 class VoiceSetupDialog(QDialog):
@@ -3001,6 +3031,7 @@ class MainWindow(QMainWindow):
         self.context_size = self.preferences.get("context_size", 0)
         self.whisper_model = self.preferences.get("whisper_model", "base")
         self.tts_enabled = self.preferences.get("tts_enabled", True)
+        self.ai_titles_enabled = self.preferences.get("ai_titles_enabled", True)
         self.chat_bubbles = []  # Track bubbles for font size updates
         
         # Chat history state
@@ -3692,7 +3723,7 @@ class MainWindow(QMainWindow):
     def open_settings(self):
         """Open settings dialog"""
         old_whisper_model = self.whisper_model
-        dialog = SettingsDialog(self, self.auto_send, self.font_size_name, self.language, self.voice_speed, self.output_device, self.input_device, self.context_size, self.whisper_model, self.tts_enabled)
+        dialog = SettingsDialog(self, self.auto_send, self.font_size_name, self.language, self.voice_speed, self.output_device, self.input_device, self.context_size, self.whisper_model, self.tts_enabled, self.ai_titles_enabled)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self.auto_send = dialog.get_auto_send()
             new_font_size = dialog.get_font_size()
@@ -3763,6 +3794,9 @@ class MainWindow(QMainWindow):
             self.tts_enabled = dialog.get_tts_enabled()
             self.tts_off_label.setVisible(not self.tts_enabled)
 
+            # Update AI titles enabled
+            self.ai_titles_enabled = dialog.get_ai_titles_enabled()
+
             # Save preferences
             self.preferences["auto_send"] = self.auto_send
             self.preferences["font_size"] = self.font_size_name
@@ -3775,6 +3809,7 @@ class MainWindow(QMainWindow):
             self.preferences["context_size"] = self.context_size
             self.preferences["whisper_model"] = self.whisper_model
             self.preferences["tts_enabled"] = self.tts_enabled
+            self.preferences["ai_titles_enabled"] = self.ai_titles_enabled
             save_preferences(self.preferences)
 
             # Prompt restart if whisper model changed
@@ -4370,6 +4405,9 @@ class MainWindow(QMainWindow):
         if self._first_user_message_sent:
             return
         self._first_user_message_sent = True
+
+        if not self.ai_titles_enabled:
+            return
 
         chat_id = self.current_chat["id"] if self.current_chat else ""
         self._title_thread = TitleGeneratorThread(chat_id, user_message, self)

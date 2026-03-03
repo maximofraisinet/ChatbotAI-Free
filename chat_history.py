@@ -85,7 +85,7 @@ def create_new_chat() -> dict:
     now = datetime.now()
     return {
         "id": chat_id,
-        "title": "New Chat",
+        "title": f"Chat — {now.strftime('%d %b %Y, %H:%M')}",
         "filename": f"{now.strftime('%Y%m%d_%H%M%S')}_{chat_id}.md",
         "created": now,
         "messages": [],  # list of {"role": ..., "content": ...}
