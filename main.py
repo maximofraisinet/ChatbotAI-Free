@@ -2932,8 +2932,16 @@ class MainWindow(QMainWindow):
         super().__init__()
         
         self.setWindowTitle("Voice Chat AI")
-        self.setGeometry(100, 100, 1400, 900)
-        self.setMinimumSize(1400, 900)
+
+        # Adapt initial window size to the screen (netbooks, small monitors, etc.)
+        screen = QApplication.primaryScreen()
+        screen_rect = screen.availableGeometry()
+        win_w = min(screen_rect.width(), 1400)
+        win_h = min(screen_rect.height(), 900)
+        x = screen_rect.x() + (screen_rect.width() - win_w) // 2
+        y = screen_rect.y() + (screen_rect.height() - win_h) // 2
+        self.setGeometry(x, y, win_w, win_h)
+        self.setMinimumSize(720, 520)
         
         # Load user preferences
         self.preferences = load_preferences()
@@ -3110,22 +3118,29 @@ class MainWindow(QMainWindow):
         chat_page_layout.setContentsMargins(0, 0, 0, 0)
         chat_page_layout.setSpacing(0)
         
-        # Chat scroll area
+        # Chat scroll area — 10% side margins via 1:8:1 stretch ratio
+        chat_h_wrapper = QHBoxLayout()
+        chat_h_wrapper.setContentsMargins(0, 0, 0, 0)
+        chat_h_wrapper.setSpacing(0)
+        chat_h_wrapper.addStretch(1)
+
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        
+
         self.chat_widget = QWidget()
         self.chat_widget.setObjectName("chatContainer")
         self.chat_layout = QVBoxLayout(self.chat_widget)
-        self.chat_layout.setContentsMargins(16, 16, 16, 16)
+        self.chat_layout.setContentsMargins(8, 16, 8, 16)
         self.chat_layout.setSpacing(12)
         self.chat_layout.addStretch()
-        
+
         scroll.setWidget(self.chat_widget)
         self.scroll_area = scroll
-        chat_page_layout.addWidget(scroll, 1)
+        chat_h_wrapper.addWidget(scroll, 8)
+        chat_h_wrapper.addStretch(1)
+        chat_page_layout.addLayout(chat_h_wrapper, 1)
         
         self.stacked_widget.addWidget(chat_page)  # Page 0: Chat
         
@@ -3196,13 +3211,12 @@ class MainWindow(QMainWindow):
         input_bar_wrapper.setStyleSheet("background-color: #131314;")
         input_bar_wrapper_layout = QHBoxLayout(input_bar_wrapper)
         input_bar_wrapper_layout.setContentsMargins(0, 0, 0, 0)
-        input_bar_wrapper_layout.addStretch()
+        input_bar_wrapper_layout.addStretch(1)
         
         input_bar = QWidget()
         input_bar.setObjectName("inputBar")
         input_bar.setMaximumWidth(1200)
-        input_bar.setMinimumWidth(1200)
-        input_bar.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
+        input_bar.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         input_layout = QVBoxLayout(input_bar)
         input_layout.setContentsMargins(16, 8, 16, 12)
         input_layout.setSpacing(8)
@@ -3313,8 +3327,8 @@ class MainWindow(QMainWindow):
 
         input_layout.addLayout(button_row)
         
-        input_bar_wrapper_layout.addWidget(input_bar)
-        input_bar_wrapper_layout.addStretch()
+        input_bar_wrapper_layout.addWidget(input_bar, 8)
+        input_bar_wrapper_layout.addStretch(1)
         
         main_layout.addWidget(input_bar_wrapper)
         
