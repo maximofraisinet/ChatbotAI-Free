@@ -3924,8 +3924,8 @@ class MainWindow(QMainWindow):
         self._characters_map = {}
 
         # Default: plain assistant (no system prompt)
-        self.character_selector.addItem("🤖 Assistant")
-        self._characters_map["🤖 Assistant"] = None
+        self.character_selector.addItem("Assistant")
+        self._characters_map["Assistant"] = None
 
         for char in load_characters():
             display = char["name"]
