@@ -2087,10 +2087,28 @@ class PracticeModeWidget(QWidget):
         if self.worker:
             word_status = list(self.worker.last_word_status)
 
-        if self.worker and self.worker.isRunning():
-            self.worker.stop()
-            self.worker.wait(3000)
+        if self.worker:
+            # Disconnect all signals BEFORE stopping to prevent stale callbacks
+            try:
+                self.worker.progress_html.disconnect()
+                self.worker.status_changed.disconnect()
+                self.worker.finished_signal.disconnect()
+            except Exception:
+                pass
+            if self.worker.isRunning():
+                self.worker.stop()
+                self.worker.wait(3000)
         self.worker = None
+
+        # Ensure the audio stream is fully closed so the next session can
+        # reopen it cleanly (in case wait() timed out before stop_stream()).
+        try:
+            self.recorder.stop_stream()
+        except Exception:
+            pass
+
+        # Reset status label so the next session starts clean
+        self.status_label.setText("⏳ Preparing…")
 
         # Show feedback if there's data
         if word_status and self._reference_display:
