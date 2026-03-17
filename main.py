@@ -378,13 +378,21 @@ class MarkdownRenderer:
         
         # Code blocks (```code```)
         def code_block_replace(match):
-            lang = match.group(1) or ''
+            lang = match.group(1).strip() if match.group(1) else ''
             code = match.group(2).strip()
-            return f'''<div style="background-color: #1E1F20; border: 1px solid #3C4043; 
-                       border-radius: 8px; padding: 12px; margin: 8px 0; font-family: 'Consolas', 'Monaco', monospace; 
-                       font-size: {font_size - 1}px; overflow-x: auto; white-space: pre-wrap;">
-                       <code>{code}</code></div>'''
-        text = re.sub(r'```(\w*)\n?(.*?)```', code_block_replace, text, flags=re.DOTALL)
+            
+            # Clean up the language name to look nicer
+            lang_display = lang.lower() if lang else 'code'
+            
+            # Pre-convert newlines to <br> so the later regex doesn't create paragraphs inside the code
+            code_html = code.replace('\n', '<br>')
+            
+            # We MUST output exactly one single line of HTML without line breaks. 
+            # Otherwise, the text.replace('\\n', '<br>') later on will inject <br> tags 
+            # BETWEEN the table tags, causing those massive empty spaces.
+            return f'<table width="100%" cellpadding="0" cellspacing="0" style="margin: 12px 0; background-color: #1E1F20; border: 1px solid #3C4043;"><tr><td style="background-color: #2D2F31; color: #9AA0A6; padding: 6px 12px; font-family: \'Google Sans\', \'Segoe UI\', sans-serif; font-size: {max(10, font_size - 3)}px; font-weight: 600; border-bottom: 1px solid #3C4043;">{lang_display}</td></tr><tr><td style="padding: 12px; font-family: \'Consolas\', \'Monaco\', monospace; font-size: {font_size - 1}px; color: #E3E3E3; white-space: pre-wrap;">{code_html}</td></tr></table>'
+            
+        text = re.sub(r'```([^\n]*)\n?(.*?)```', code_block_replace, text, flags=re.DOTALL)
 
         # Markdown tables  (must run before newline conversion)
         def table_replace(match):
