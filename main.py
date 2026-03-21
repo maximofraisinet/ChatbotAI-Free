@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
     QInputDialog, QMenu
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, pyqtSlot, QTimer, QPropertyAnimation, QEasingCurve, QRect
-from PyQt6.QtGui import QFont, QColor, QPainter, QPen
+from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QIcon
 
 from styles import GEMINI_STYLE, COLORS
 from audio_utils import AudioRecorder, AudioPlayer
@@ -3033,6 +3033,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         
         self.setWindowTitle("Voice Chat AI")
+        self.setWindowIcon(QIcon("logo.svg"))
 
         # Adapt initial window size to the screen (netbooks, small monitors, etc.)
         screen = QApplication.primaryScreen()
