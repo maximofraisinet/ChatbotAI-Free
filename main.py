@@ -17,7 +17,7 @@ from PyQt6.QtWidgets import (
     QInputDialog, QMenu
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, pyqtSlot, QTimer, QPropertyAnimation, QEasingCurve, QRect
-from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QIcon
+from PyQt6.QtGui import QFont, QColor, QPainter, QPen, QIcon, QTextDocument
 
 from styles import GEMINI_STYLE, COLORS
 from audio_utils import AudioRecorder, AudioPlayer
@@ -361,126 +361,6 @@ class WorkerThread(QThread):
         text = re.sub(r'`(.+?)`', r'\1', text)
         
         return text.strip()
-
-
-class MarkdownRenderer:
-    """Utility class to convert Markdown to HTML for display"""
-    
-    @staticmethod
-    def to_html(text, font_size=15):
-        """Convert markdown text to styled HTML"""
-        import re
-        
-        # Escape HTML special characters first (except for what we'll process)
-        text = text.replace('&', '&amp;')
-        text = text.replace('<', '&lt;')
-        text = text.replace('>', '&gt;')
-        
-        # Code blocks (```code```)
-        def code_block_replace(match):
-            lang = match.group(1).strip() if match.group(1) else ''
-            code = match.group(2).strip()
-            
-            # Clean up the language name to look nicer
-            lang_display = lang.lower() if lang else 'code'
-            
-            # Pre-convert newlines to <br> so the later regex doesn't create paragraphs inside the code
-            code_html = code.replace('\n', '<br>')
-            
-            # We MUST output exactly one single line of HTML without line breaks. 
-            # Otherwise, the text.replace('\\n', '<br>') later on will inject <br> tags 
-            # BETWEEN the table tags, causing those massive empty spaces.
-            return f'<table width="100%" cellpadding="0" cellspacing="0" style="margin: 12px 0; background-color: #1E1F20; border: 1px solid #3C4043;"><tr><td style="background-color: #2D2F31; color: #9AA0A6; padding: 6px 12px; font-family: \'Google Sans\', \'Segoe UI\', sans-serif; font-size: {max(10, font_size - 3)}px; font-weight: 600; border-bottom: 1px solid #3C4043;">{lang_display}</td></tr><tr><td style="padding: 12px; font-family: \'Consolas\', \'Monaco\', monospace; font-size: {font_size - 1}px; color: #E3E3E3; white-space: pre-wrap;">{code_html}</td></tr></table>'
-            
-        text = re.sub(r'```([^\n]*)\n?(.*?)```', code_block_replace, text, flags=re.DOTALL)
-
-        # Markdown tables  (must run before newline conversion)
-        def table_replace(match):
-            lines = [l for l in match.group(0).split('\n') if l.strip()]
-            if len(lines) < 3:
-                return match.group(0)
-            headers = [h.strip() for h in lines[0].strip('|').split('|')]
-            rows = []
-            for line in lines[2:]:
-                cells = [c.strip() for c in line.strip('|').split('|')]
-                rows.append(cells)
-            th_html = ''.join(f'<th>{h}</th>' for h in headers)
-            tr_html = ''.join(
-                f'<tr class="{"tr-even" if i % 2 == 0 else "tr-odd"}">'
-                + ''.join(f'<td>{c}</td>' for c in row)
-                + '</tr>'
-                for i, row in enumerate(rows)
-            )
-            return f'<table><thead><tr>{th_html}</tr></thead><tbody>{tr_html}</tbody></table>\n'
-        text = re.sub(
-            r'(?m)^\|[^\n]+\|\s*\n\|[-|: \t]+\|\s*\n(?:\|[^\n]+\|\s*\n?)+',
-            table_replace, text
-        )
-
-        # Inline code (`code`)
-        text = re.sub(r'`([^`]+)`', 
-                     rf'<code style="background-color: #282A2C; padding: 2px 6px; border-radius: 4px; font-family: monospace; font-size: {font_size - 1}px;">\1</code>', 
-                     text)
-        
-        # Horizontal rules (--- or ***)
-        text = re.sub(r'^---+$', '<hr style="border: none; border-top: 1px solid #3C4043; margin: 8px 0;">', text, flags=re.MULTILINE)
-        text = re.sub(r'^\*\*\*+$', '<hr style="border: none; border-top: 1px solid #3C4043; margin: 8px 0;">', text, flags=re.MULTILINE)
-        
-        # Headers (#### Header, ### Header, etc.)
-        text = re.sub(r'^#### (.+)$', rf'<h4 style="font-size: {font_size + 2}px; font-weight: 600; margin: 8px 0 4px 0; color: #E3E3E3;">\1</h4>', text, flags=re.MULTILINE)
-        text = re.sub(r'^### (.+)$', rf'<h3 style="font-size: {font_size + 3}px; font-weight: 600; margin: 10px 0 5px 0; color: #E3E3E3;">\1</h3>', text, flags=re.MULTILINE)
-        text = re.sub(r'^## (.+)$', rf'<h2 style="font-size: {font_size + 5}px; font-weight: 600; margin: 12px 0 6px 0; color: #E3E3E3;">\1</h2>', text, flags=re.MULTILINE)
-        text = re.sub(r'^# (.+)$', rf'<h1 style="font-size: {font_size + 8}px; font-weight: 700; margin: 14px 0 8px 0; color: #E3E3E3;">\1</h1>', text, flags=re.MULTILINE)
-        
-        # Bold (**text** or __text__)
-        text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
-        text = re.sub(r'__(.+?)__', r'<strong>\1</strong>', text)
-        
-        # Italic (*text* or _text_)
-        text = re.sub(r'\*([^\*]+)\*', r'<em>\1</em>', text)
-        text = re.sub(r'_([^_]+)_', r'<em>\1</em>', text)
-        
-        # Lists disabled - showing as plain text for now
-        # Will keep the - or * or 1. 2. etc. as plain text
-        
-        # # Unordered lists (- item or * item) - DISABLED
-        # # Ordered lists (1. item) - DISABLED
-        
-        # Clean up extra newlines around block elements (lists, headers, hr)
-        text = re.sub(r'\n+(</?[uoh][lrl1-4]?>)', r'\1', text)  # Remove newlines before/after list/header tags
-        text = re.sub(r'(</?[uoh][lrl1-4]?>)\n+', r'\1', text)
-        text = re.sub(r'\n+(<hr[^>]*>)', r'\1', text)  # Remove newlines before hr
-        text = re.sub(r'(<hr[^>]*>)\n+', r'\1', text)  # Remove newlines after hr
-        text = re.sub(r'(</ul>|</ol>)\n+', r'\1', text)  # Remove newlines after closing list tags
-        text = re.sub(r'\n+(</li>)', r'\1', text)  # Remove newlines before closing li tags
-        
-        # Paragraphs (double newline) - but not around block elements
-        text = re.sub(r'\n\n+', '</p><p style="margin: 8px 0; line-height: 1.6;">', text)
-        
-        # Single newlines to <br> - but not after block elements
-        # First, protect block elements with a marker
-        text = re.sub(r'(</ul>|</ol>|</h[1-4]>|<hr[^>]*>)\n', r'\1<!-- BLOCK -->', text)
-        text = re.sub(r'\n(<ul|<ol|<h[1-4]|<hr)', r'<!-- BLOCK -->\1', text)
-        
-        # Now convert remaining newlines to <br>
-        text = text.replace('\n', '<br>')
-        
-        # Remove the markers
-        text = text.replace('<!-- BLOCK -->', '')
-        
-        # Wrap in paragraph (with minimal margin)
-        html = f'''<div style="margin: 0; line-height: 1.6;">{text}</div>'''
-
-        return html
-
-    @staticmethod
-    def extract_tables(text):
-        """Return list of raw markdown table strings found in text."""
-        import re
-        return re.findall(
-            r'(?m)^\|[^\n]+\|\s*\n\|[-|: \t]+\|\s*\n(?:\|[^\n]+\|\s*\n?)+',
-            text
-        )
 
 
 class ThinkingWidget(QWidget):
@@ -877,99 +757,10 @@ class BotMessageWidget(QFrame):
     def update_text(self, text):
         """Update the message text with markdown rendering"""
         self._raw_text = text
-        html_content = MarkdownRenderer.to_html(text, self.font_size)
-        
-        # Full HTML document with styling
-        full_html = f'''
-        <html>
-        <head>
-            <style>
-                body {{
-                    color: #E3E3E3;
-                    font-family: 'Google Sans', 'Segoe UI', 'Roboto', Arial, sans-serif;
-                    font-size: {self.font_size}px;
-                    line-height: 1.5;
-                    margin: 0;
-                    padding: 0;
-                    background-color: transparent;
-                }}
-                ul, ol {{
-                    margin: 2px 0;
-                    padding-left: 20px;
-                    line-height: 1.2;
-                }}
-                li {{
-                    margin: 0;
-                    padding: 0;
-                    line-height: 1.2;
-                }}
-                strong {{
-                    font-weight: 600;
-                    color: #FFFFFF;
-                }}
-                em {{
-                    font-style: italic;
-                }}
-                code {{
-                    background-color: #282A2C;
-                    padding: 2px 6px;
-                    border-radius: 4px;
-                    font-family: 'Consolas', 'Monaco', monospace;
-                    font-size: {self.font_size - 1}px;
-                }}
-                a {{
-                    color: #8AB4F8;
-                    text-decoration: none;
-                }}
-                a:hover {{
-                    text-decoration: underline;
-                }}
-                h1, h2, h3, h4 {{
-                    margin: 8px 0 4px 0;
-                }}
-                hr {{
-                    border: none;
-                    border-top: 1px solid #3C4043;
-                    margin: 6px 0;
-                }}
-                p {{
-                    margin: 4px 0;
-                }}
-                table {{
-                    border-collapse: collapse;
-                    width: 100%;
-                    margin: 10px 0;
-                }}
-                th {{
-                    background-color: #303136;
-                    color: #FFFFFF;
-                    padding: 8px 14px;
-                    text-align: left;
-                    font-weight: 600;
-                    border: 1px solid #5C6166;
-                    font-size: {self.font_size}px;
-                }}
-                td {{
-                    padding: 6px 14px;
-                    border: 1px solid #3C4043;
-                    color: #E3E3E3;
-                    font-size: {self.font_size}px;
-                }}
-                tr.tr-even td {{
-                    background-color: #26272B;
-                }}
-                tr.tr-odd td {{
-                    background-color: #1E1F20;
-                }}
-            </style>
-        </head>
-        <body>{html_content}</body>
-        </html>
-        '''
-        
-        self.text_browser.setHtml(full_html)
-
-        # Adjust height to content
+        self.text_browser.document().setMarkdown(
+            text,
+            features=QTextDocument.MarkdownFeature.MarkdownDialectGitHub,
+        )
         self.text_browser.document().setTextWidth(self.text_browser.viewport().width())
         doc_height = self.text_browser.document().size().height()
         self.text_browser.setMinimumHeight(int(doc_height) + 10)
@@ -985,6 +776,25 @@ class BotMessageWidget(QFrame):
                 font-size: {font_size}px;
                 selection-background-color: #3C4043;
             }}
+        """)
+        self.text_browser.document().setDefaultStyleSheet(f"""
+            body {{
+                color: #E3E3E3;
+                font-family: 'Google Sans', 'Segoe UI', 'Roboto', Arial, sans-serif;
+                font-size: {font_size}px;
+                line-height: 1.5;
+                background-color: transparent;
+            }}
+            strong, b {{ font-weight: 600; color: #FFFFFF; }}
+            em, i {{ font-style: italic; }}
+            a {{ color: #8AB4F8; text-decoration: none; }}
+            a:hover {{ text-decoration: underline; }}
+            h1, h2, h3, h4 {{ margin: 8px 0 4px 0; }}
+            hr {{ border: none; border-top: 1px solid #3C4043; margin: 6px 0; }}
+            p {{ margin: 4px 0; }}
+            table {{ border-collapse: collapse; width: 100%; margin: 10px 0; }}
+            th {{ background-color: #303136; color: #FFFFFF; padding: 8px 14px; text-align: left; font-weight: 600; border: 1px solid #5C6166; }}
+            td {{ padding: 6px 14px; border: 1px solid #3C4043; color: #E3E3E3; }}
         """)
         # Re-render text with new font size
         if hasattr(self, '_raw_text'):
