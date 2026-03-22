@@ -1,65 +1,70 @@
 """
-Google Gemini/ChatGPT-Inspired Dark Mode Styles
-Modern, minimal, clean design with distinct message styles
+Google Gemini Inspired Dark Theme
+Modern, clean design with refined Gemini aesthetics
 """
 
-# Color Palette (Gemini Dark)
 COLORS = {
-    'background': '#131314',
-    'surface': '#1E1F20',
-    'surface_variant': '#282A2C',
-    'user_bubble': '#303136',  # Gris oscuro suave para usuario
-    'bot_bubble': 'transparent',  # Sin fondo para bot
-    'text_primary': '#E3E3E3',
+    'background': '#101417',
+    'surface': '#1C1E21',
+    'surface_variant': '#2D2F31',
+    'user_bubble': '#2D2F31',
+    'bot_bubble': 'transparent',
+    'text_primary': '#E8EAED',
     'text_secondary': '#9AA0A6',
     'accent': '#8AB4F8',
-    'mic_button': '#1A73E8',
+    'accent_blue': '#4285F4',
+    'mic_button': '#4285F4',
     'mic_recording': '#EA4335',
     'border': '#3C4043',
-    'code_bg': '#1E1F20',
+    'code_bg': '#1C1E21',
     'code_border': '#3C4043',
+    'success': '#34A853',
+    'warning': '#FBBC04',
+    'error': '#EA4335',
 }
 
 GEMINI_STYLE = """
 /* ===== MAIN WINDOW ===== */
 QMainWindow {
-    background-color: #131314;
+    background-color: #101417;
 }
 
+/* ===== BASE WIDGET ===== */
 QWidget {
-    background-color: #131314;
-    color: #E3E3E3;
-    font-family: 'Google Sans', 'Segoe UI', 'Roboto', Arial, sans-serif;
+    background-color: #101417;
+    color: #E8EAED;
+    font-family: 'Google Sans', 'Segoe UI', system-ui, sans-serif;
 }
 
 /* ===== SCROLL AREA ===== */
 QScrollArea {
-    background-color: #131314;
+    background-color: #101417;
     border: none;
 }
 
 QScrollArea > QWidget > QWidget {
-    background-color: #131314;
+    background-color: #101417;
 }
 
 QWidget#chatContainer {
-    background-color: #131314;
+    background-color: #101417;
 }
 
 /* ===== HEADER ===== */
 QWidget#headerWidget {
-    background-color: #131314;
-    border-bottom: 1px solid #282A2C;
+    background-color: #101417;
+    border-bottom: 1px solid #3C4043;
 }
 
-/* ===== MODEL SELECTOR - Pill Style ===== */
+/* ===== MODEL SELECTOR ===== */
 QComboBox#modelSelector {
-    background-color: #282A2C;
-    color: #E3E3E3;
+    background-color: #2D2F31;
+    color: #E8EAED;
     border: 1px solid #3C4043;
-    border-radius: 18px;
+    border-radius: 20px;
     padding: 10px 20px;
     font-size: 13px;
+    font-weight: 500;
     min-width: 200px;
 }
 
@@ -82,8 +87,8 @@ QComboBox#modelSelector::down-arrow {
 }
 
 QComboBox#modelSelector QAbstractItemView {
-    background-color: #282A2C;
-    color: #E3E3E3;
+    background-color: #1C1E21;
+    color: #E8EAED;
     selection-background-color: #3C4043;
     border: 1px solid #3C4043;
     border-radius: 12px;
@@ -103,12 +108,13 @@ QComboBox#modelSelector QAbstractItemView::item:hover {
 
 /* ===== VOICE SELECTOR ===== */
 QComboBox#voiceSelector {
-    background-color: #282A2C;
-    color: #E3E3E3;
+    background-color: #2D2F31;
+    color: #E8EAED;
     border: 1px solid #3C4043;
-    border-radius: 18px;
+    border-radius: 20px;
     padding: 10px 20px;
     font-size: 13px;
+    font-weight: 500;
     min-width: 150px;
 }
 
@@ -131,8 +137,8 @@ QComboBox#voiceSelector::down-arrow {
 }
 
 QComboBox#voiceSelector QAbstractItemView {
-    background-color: #282A2C;
-    color: #E3E3E3;
+    background-color: #1C1E21;
+    color: #E8EAED;
     selection-background-color: #3C4043;
     border: 1px solid #3C4043;
     border-radius: 12px;
@@ -158,14 +164,14 @@ QLabel#statusLabel {
     background: transparent;
 }
 
-/* ===== USER MESSAGE BUBBLE (mantiene burbuja) ===== */
+/* ===== USER MESSAGE BUBBLE ===== */
 QFrame#userBubble {
-    background-color: #303136;
-    border-radius: 22px;
-    border: none;
+    background-color: #2D2F31;
+    border: 1px solid #3C4043;
+    border-radius: 18px;
 }
 
-/* ===== BOT MESSAGE CONTAINER (sin burbuja, estilo ChatGPT) ===== */
+/* ===== BOT MESSAGE CONTAINER ===== */
 QFrame#botMessage {
     background-color: transparent;
     border: none;
@@ -174,16 +180,16 @@ QFrame#botMessage {
 
 /* ===== BOT AVATAR ===== */
 QLabel#botAvatar {
-    background-color: #8AB4F8;
+    background: qlineargradient(x1:0%, y1:0%, x2:100%, y2:100%, stop:0% #8AB4F8, stop:50% #7C9AFE, stop:100% #4285F4);
     border-radius: 16px;
-    color: #131314;
+    color: #101417;
     font-weight: bold;
     font-size: 14px;
 }
 
 /* ===== MESSAGE TEXT LABELS ===== */
 QLabel#userBubbleText {
-    color: #FFFFFF;
+    color: #E8EAED;
     font-size: 15px;
     padding: 14px 20px;
     background: transparent;
@@ -191,26 +197,26 @@ QLabel#userBubbleText {
 }
 
 QLabel#botMessageText {
-    color: #E3E3E3;
+    color: #E8EAED;
     font-size: 15px;
     padding: 4px 0px;
     background: transparent;
     line-height: 1.6;
 }
 
-/* ===== MARKDOWN STYLED TEXT (para QTextBrowser) ===== */
+/* ===== MARKDOWN TEXT ===== */
 QTextBrowser#markdownText {
     background-color: transparent;
     border: none;
-    color: #E3E3E3;
+    color: #E8EAED;
     font-size: 15px;
     line-height: 1.6;
     selection-background-color: #3C4043;
 }
 
-/* ===== LEGACY BUBBLE TEXT (compatibilidad) ===== */
+/* ===== LEGACY BUBBLE TEXT ===== */
 QLabel#bubbleText {
-    color: #E3E3E3;
+    color: #E8EAED;
     font-size: 15px;
     padding: 14px 18px;
     background: transparent;
@@ -218,15 +224,15 @@ QLabel#bubbleText {
 
 /* ===== INPUT BAR ===== */
 QWidget#inputBar {
-    background-color: #1E1F20;
-    border-top: 1px solid #282A2C;
+    background-color: #1C1E21;
+    border-top: 1px solid #3C4043;
     border-radius: 16px;
 }
 
 /* ===== SEND BUTTON ===== */
 QPushButton#sendButton {
     background-color: transparent;
-    color: #E3E3E3;
+    color: #9AA0A6;
     border: none;
     border-radius: 20px;
     min-width: 40px;
@@ -237,7 +243,8 @@ QPushButton#sendButton {
 }
 
 QPushButton#sendButton:hover {
-    background-color: #282A2C;
+    background-color: #2D2F31;
+    color: #8AB4F8;
 }
 
 QPushButton#sendButton:pressed {
@@ -249,11 +256,11 @@ QPushButton#sendButton:disabled {
     color: #5F6368;
 }
 
-/* ===== MIC BUTTON - Large Circular ===== */
+/* ===== MIC BUTTON ===== */
 QPushButton#micButton {
-    background-color: transparent;
-    color: #E3E3E3;
-    border: none;
+    background-color: #2D2F31;
+    color: #4285F4;
+    border: 2px solid #3C4043;
     border-radius: 32px;
     min-width: 64px;
     max-width: 64px;
@@ -263,14 +270,16 @@ QPushButton#micButton {
 }
 
 QPushButton#micButton:hover {
-    background-color: #282A2C;
+    background-color: #3C4043;
+    border-color: #4285F4;
 }
 
 QPushButton#micButton:pressed {
-    background-color: #3C4043;
+    background-color: #4285F4;
+    color: #FFFFFF;
 }
 
-/* ===== CLEAR BUTTON - Ghost ===== */
+/* ===== CLEAR BUTTON ===== */
 QPushButton#clearButton {
     background-color: transparent;
     color: #9AA0A6;
@@ -281,15 +290,15 @@ QPushButton#clearButton {
 }
 
 QPushButton#clearButton:hover {
-    background-color: #282A2C;
-    color: #E3E3E3;
+    background-color: #2D2F31;
+    color: #E8EAED;
     border-color: #5F6368;
 }
 
-/* ===== SCROLLBAR - Minimal ===== */
+/* ===== SCROLLBAR ===== */
 QScrollBar:vertical {
     border: none;
-    background-color: #131314;
+    background-color: #101417;
     width: 8px;
     margin: 0px;
 }
@@ -324,7 +333,7 @@ QLabel#recordingDot {
 
 /* ===== LIVE MODE ===== */
 QWidget#liveModeWidget {
-    background-color: #131314;
+    background-color: #101417;
 }
 
 QWidget#liveIndicatorContainer {
@@ -339,15 +348,15 @@ QLabel#liveStateLabel {
 }
 
 QLabel#liveTranscriptLabel {
-    color: #E3E3E3;
+    color: #E8EAED;
     font-size: 14px;
     background: transparent;
     padding: 20px;
 }
 
 QPushButton#liveMuteButton {
-    background-color: #282A2C;
-    color: #E3E3E3;
+    background-color: #2D2F31;
+    color: #E8EAED;
     border: 2px solid #3C4043;
     border-radius: 35px;
     min-width: 70px;
@@ -365,6 +374,7 @@ QPushButton#liveMuteButton:hover {
 QPushButton#liveMuteButton:checked {
     background-color: #EA4335;
     border-color: #EA4335;
+    color: white;
 }
 
 QPushButton#liveExitButton {
@@ -384,9 +394,9 @@ QPushButton#liveExitButton:hover {
 }
 
 QPushButton#liveStartButton {
-    background-color: transparent;
-    color: #E3E3E3;
-    border: none;
+    background-color: #2D2F31;
+    color: #4285F4;
+    border: 2px solid #3C4043;
     border-radius: 30px;
     min-width: 60px;
     max-width: 60px;
@@ -396,17 +406,19 @@ QPushButton#liveStartButton {
 }
 
 QPushButton#liveStartButton:hover {
-    background-color: #282A2C;
+    background-color: #3C4043;
+    border-color: #4285F4;
 }
 
 QPushButton#liveStartButton:pressed {
-    background-color: #3C4043;
+    background-color: #4285F4;
+    color: white;
 }
 
 QPushButton#practiceStartButton {
-    background-color: transparent;
-    color: #E3E3E3;
-    border: none;
+    background-color: #2D2F31;
+    color: #8AB4F8;
+    border: 2px solid #3C4043;
     border-radius: 30px;
     min-width: 60px;
     max-width: 60px;
@@ -416,38 +428,40 @@ QPushButton#practiceStartButton {
 }
 
 QPushButton#practiceStartButton:hover {
-    background-color: #282A2C;
+    background-color: #3C4043;
+    border-color: #8AB4F8;
 }
 
 QPushButton#practiceStartButton:pressed {
-    background-color: #3C4043;
+    background-color: #8AB4F8;
+    color: #101417;
 }
 
 /* ===== TOOLTIP ===== */
 QToolTip {
-    background-color: #202124;
-    color: #E3E3E3;
-    border: 1px solid #5C6166;
+    background-color: #1C1E21;
+    color: #E8EAED;
+    border: 1px solid #5F6368;
     border-radius: 8px;
     padding: 8px 12px;
     font-size: 12px;
-    font-family: 'Google Sans', 'Segoe UI', Arial, sans-serif;
+    font-family: 'Google Sans', 'Segoe UI', system-ui, sans-serif;
 }
 
-/* ===== SIDEBAR (Chat History) ===== */
+/* ===== SIDEBAR ===== */
 QWidget#sidebarWidget {
-    background-color: #1E1F20;
-    border-right: 1px solid #282A2C;
+    background-color: #1C1E21;
+    border-right: 1px solid #3C4043;
 }
 
 QPushButton#newChatButton {
-    background-color: #303136;
-    color: #E3E3E3;
+    background-color: #2D2F31;
+    color: #E8EAED;
     border: 1px solid #3C4043;
     border-radius: 20px;
     padding: 10px 16px;
     font-size: 14px;
-    font-weight: bold;
+    font-weight: 600;
     text-align: left;
 }
 
@@ -469,8 +483,8 @@ QPushButton#hamburgerButton {
 }
 
 QPushButton#hamburgerButton:hover {
-    background-color: #282A2C;
-    color: #E3E3E3;
+    background-color: #2D2F31;
+    color: #E8EAED;
 }
 
 QListWidget#chatListWidget {
@@ -478,7 +492,7 @@ QListWidget#chatListWidget {
     border: none;
     outline: none;
     font-size: 13px;
-    color: #E3E3E3;
+    color: #E8EAED;
 }
 
 QListWidget#chatListWidget::item {
@@ -490,12 +504,12 @@ QListWidget#chatListWidget::item {
 }
 
 QListWidget#chatListWidget::item:hover {
-    background-color: #282A2C;
+    background-color: #2D2F31;
 }
 
 QListWidget#chatListWidget::item:selected {
-    background-color: #303136;
-    color: #E3E3E3;
+    background-color: #3C4043;
+    color: #E8EAED;
 }
 
 QLabel#sidebarTitle {
@@ -508,12 +522,13 @@ QLabel#sidebarTitle {
 
 /* ===== CHARACTER SELECTOR ===== */
 QComboBox#characterSelector {
-    background-color: #282A2C;
-    color: #E3E3E3;
+    background-color: #2D2F31;
+    color: #E8EAED;
     border: 1px solid #3C4043;
-    border-radius: 18px;
+    border-radius: 20px;
     padding: 10px 20px;
     font-size: 13px;
+    font-weight: 500;
     min-width: 150px;
 }
 
@@ -536,8 +551,8 @@ QComboBox#characterSelector::down-arrow {
 }
 
 QComboBox#characterSelector QAbstractItemView {
-    background-color: #282A2C;
-    color: #E3E3E3;
+    background-color: #1C1E21;
+    color: #E8EAED;
     selection-background-color: #3C4043;
     border: 1px solid #3C4043;
     border-radius: 12px;
@@ -556,5 +571,4 @@ QComboBox#characterSelector QAbstractItemView::item:hover {
 }
 """
 
-# For backwards compatibility
 DARK_STYLE = GEMINI_STYLE

@@ -409,7 +409,7 @@ class ThinkingWidget(QWidget):
         self.content.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
         self.content.setStyleSheet("""
             QTextBrowser {
-                background-color: #1A1B1E;
+                background-color: #1C1E21;
                 border: 1px solid #3C4043;
                 border-radius: 8px;
                 color: #9AA0A6;
@@ -419,12 +419,12 @@ class ThinkingWidget(QWidget):
                 selection-background-color: #3C4043;
             }
             QScrollBar:vertical {
-                background: #2A2B2E;
+                background: #101417;
                 width: 6px;
                 border-radius: 3px;
             }
             QScrollBar::handle:vertical {
-                background: #5F6368;
+                background: #3C4043;
                 border-radius: 3px;
                 min-height: 20px;
             }
@@ -488,7 +488,7 @@ class UserMessageBubble(QFrame):
         """Update the font size"""
         self.font_size = font_size
         self.label.setStyleSheet(f"""
-            color: #FFFFFF;
+            color: #E8EAED;
             font-size: {font_size}px;
             padding: 14px 20px;
             background: transparent;
@@ -496,9 +496,9 @@ class UserMessageBubble(QFrame):
         """)
         self.setStyleSheet(f"""
             QFrame#userBubble {{
-                background-color: #303136;
-                border-radius: 22px;
-                border: none;
+                background-color: #2D2F31;
+                border: 1px solid #3C4043;
+                border-radius: 18px;
             }}
         """)
 
@@ -511,8 +511,8 @@ class ContextPopup(QFrame):
         self.setObjectName("contextPopup")
         self.setStyleSheet("""
             QFrame#contextPopup {
-                background-color: #202124;
-                border: 1px solid #5C6166;
+                background-color: #1C1E21;
+                border: 1px solid #5F6368;
                 border-radius: 10px;
             }
         """)
@@ -719,9 +719,9 @@ class BotMessageWidget(QFrame):
         self.avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.avatar.setStyleSheet("""
             QLabel#botAvatar {
-                background-color: #8AB4F8;
+                background: qlineargradient(x1:0%, y1:0%, x2:100%, y2:100%, stop:0% #8AB4F8, stop:50% #7C9AFE, stop:100% #4285F4);
                 border-radius: 16px;
-                color: #131314;
+                color: #101417;
                 font-size: 16px;
             }
         """)
@@ -772,15 +772,15 @@ class BotMessageWidget(QFrame):
             QTextBrowser#markdownText {{
                 background-color: transparent;
                 border: none;
-                color: #E3E3E3;
+                color: #E8EAED;
                 font-size: {font_size}px;
                 selection-background-color: #3C4043;
             }}
         """)
         self.text_browser.document().setDefaultStyleSheet(f"""
             body {{
-                color: #E3E3E3;
-                font-family: 'Google Sans', 'Segoe UI', 'Roboto', Arial, sans-serif;
+                color: #E8EAED;
+                font-family: 'Google Sans', 'Segoe UI', system-ui, sans-serif;
                 font-size: {font_size}px;
                 line-height: 1.5;
                 background-color: transparent;
@@ -793,8 +793,8 @@ class BotMessageWidget(QFrame):
             hr {{ border: none; border-top: 1px solid #3C4043; margin: 6px 0; }}
             p {{ margin: 4px 0; }}
             table {{ border-collapse: collapse; width: 100%; margin: 10px 0; }}
-            th {{ background-color: #303136; color: #FFFFFF; padding: 8px 14px; text-align: left; font-weight: 600; border: 1px solid #5C6166; }}
-            td {{ padding: 6px 14px; border: 1px solid #3C4043; color: #E3E3E3; }}
+            th {{ background-color: #2D2F31; color: #FFFFFF; padding: 8px 14px; text-align: left; font-weight: 600; border: 1px solid #5F6368; }}
+            td {{ padding: 6px 14px; border: 1px solid #3C4043; color: #E8EAED; }}
         """)
         # Re-render text with new font size
         if hasattr(self, '_raw_text'):
