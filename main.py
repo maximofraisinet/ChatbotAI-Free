@@ -3211,12 +3211,12 @@ class MainWindow(QMainWindow):
         self.clear_btn.setFixedWidth(70)
         button_row.addWidget(self.clear_btn)
 
-        # Attach PDF button (right of Clear)
+        # Attach Document button (right of Clear)
         self.attach_btn = QPushButton("\U0001F4CE")
         self.attach_btn.setObjectName("attachButton")
-        self.attach_btn.setToolTip("Attach a PDF document")
+        self.attach_btn.setToolTip("Attach a document (PDF, MD, TXT)")
         self.attach_btn.setFixedSize(42, 42)
-        self.attach_btn.clicked.connect(self.attach_pdf)
+        self.attach_btn.clicked.connect(self.attach_document)
         self.attach_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.attach_btn.setStyleSheet("""
             QPushButton {
@@ -3923,14 +3923,14 @@ class MainWindow(QMainWindow):
                 scrollbar.setValue(scrollbar.maximum())
             )
     
-    def attach_pdf(self):
-        """Open a file dialog to attach a PDF and inject its text into the context."""
+    def attach_document(self):
+        """Open a file dialog to attach a document and inject its text into the context."""
         if self.ai_manager is None:
             self.status_label.setText("AI not loaded!")
             return
 
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "Select PDF", "", "PDF Files (*.pdf)"
+            self, "Select Document", "", "Supported Files (*.pdf *.md *.txt);;PDF Files (*.pdf);;Markdown Files (*.md);;Text Files (*.txt)"
         )
         if not file_path:
             return
@@ -3959,7 +3959,7 @@ class MainWindow(QMainWindow):
         _spinner_label.setStyleSheet("font-size: 36px; background: transparent;")
         _card_lay.addWidget(_spinner_label)
 
-        _title_label = QLabel("Processing PDF…")
+        _title_label = QLabel("Processing Document…")
         _title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         _title_label.setStyleSheet(
             "font-size: 16px; font-weight: bold; color: #E3E3E3; background: transparent;"
@@ -3991,18 +3991,26 @@ class MainWindow(QMainWindow):
 
         # ── Extract text ──────────────────────────────────────────────
         try:
-            import fitz  # PyMuPDF
-            doc = fitz.open(file_path)
-            pages = len(doc)
+            ext = os.path.splitext(file_path)[1].lower()
+            pages = 1
             text = ""
-            for page in doc:
-                text += page.get_text()
-            doc.close()
+            if ext == '.pdf':
+                import fitz  # PyMuPDF
+                doc = fitz.open(file_path)
+                pages = len(doc)
+                for page in doc:
+                    text += page.get_text()
+                doc.close()
+            elif ext in ('.md', '.txt'):
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    text = f.read()
+            else:
+                raise ValueError(f"Unsupported file type: {ext}")
         except Exception as e:
             loading.close()
             QMessageBox.warning(
-                self, "PDF Error",
-                f"Could not extract text from the PDF:\n{e}"
+                self, "Document Error",
+                f"Could not extract text from the document:\n{e}"
             )
             return
 
@@ -4010,8 +4018,8 @@ class MainWindow(QMainWindow):
         if not text:
             loading.close()
             QMessageBox.warning(
-                self, "Empty PDF",
-                "The selected PDF does not contain any extractable text."
+                self, "Empty Document",
+                "The selected document does not contain any extractable text."
             )
             return
 
@@ -4184,8 +4192,8 @@ class MainWindow(QMainWindow):
             f"\U0001F4C4 Document **{filename}** loaded into context "
             f"({pdf_tokens:,} tokens used). Ask me anything about it!"
         )
-        self.status_label.setText(f"PDF loaded: {filename}")
-        print(f"\U0001F4C4 PDF '{filename}' injected: {pdf_tokens:,} tokens")
+        self.status_label.setText(f"Document loaded: {filename}")
+        print(f"\U0001F4C4 Document '{filename}' injected: {pdf_tokens:,} tokens")
 
     def clear_chat(self):
         """Clear all messages from the screen (does NOT touch history file)."""

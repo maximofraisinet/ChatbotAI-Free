@@ -43,3 +43,5 @@ characters/*
 !characters/es_entrevistador.json
 !characters/es_amigo_casual.json
 !characters/es_profesor_ingles.json
+
+AGENTS.md
