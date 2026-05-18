@@ -2991,6 +2991,44 @@ class MainWindow(QMainWindow):
         self.model_selector.currentTextChanged.connect(self.on_model_changed)
         header_layout.addWidget(self.model_selector)
         
+        # Think toggle button
+        header_layout.addSpacing(10)
+        self.think_btn = QPushButton("🧠 Thinking: ON")
+        self.think_btn.setCheckable(True)
+        
+        # Load saved think_mode preference or default to True
+        saved_think_mode = self.preferences.get("think_mode", True)
+        self.think_btn.setChecked(saved_think_mode)
+        if self.ai_manager:
+            self.ai_manager.think_mode = saved_think_mode
+        self.think_btn.setText(f"🧠 Thinking: {'ON' if saved_think_mode else 'OFF'}")
+        
+        self.think_btn.setObjectName("thinkToggleBtn")
+        self.think_btn.setFixedHeight(30)
+        self.think_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2D2D2D;
+                color: #FFFFFF;
+                border: 1px solid #444444;
+                border-radius: 15px;
+                padding: 0 15px;
+                font-size: 12px;
+                font-weight: bold;
+            }
+            QPushButton:checked {
+                background-color: #1A73E8;
+                border: 1px solid #1A73E8;
+            }
+            QPushButton:hover {
+                background-color: #3D3D3D;
+            }
+            QPushButton:checked:hover {
+                background-color: #1765CC;
+            }
+        """)
+        self.think_btn.clicked.connect(self.toggle_think_mode)
+        header_layout.addWidget(self.think_btn)
+        
         # Voice Selector (next to model selector)
         header_layout.addSpacing(20)
         
@@ -3826,6 +3864,19 @@ class MainWindow(QMainWindow):
         self.status_label.setText(status)
     
     @pyqtSlot(str)
+    @pyqtSlot(bool)
+    def toggle_think_mode(self, checked):
+        """Toggle thinking mode for the LLM"""
+        if self.ai_manager:
+            self.ai_manager.think_mode = checked
+            state_text = "ON" if checked else "OFF"
+            self.think_btn.setText(f"🧠 Thinking: {state_text}")
+            print(f"Thinking mode set to: {state_text}")
+            
+            # Save to preferences
+            self.preferences["think_mode"] = checked
+            save_preferences(self.preferences)
+
     def on_model_changed(self, model_name):
         """Handle model selection change"""
         if self.ai_manager:

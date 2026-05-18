@@ -45,6 +45,7 @@ class AIManager:
         self.language = language
         self.current_voice = voice_name
         self.num_ctx = 0  # 0 = use model default
+        self.think_mode = True  # Enable thinking by default
         
         # Check CUDA availability
         try:
@@ -249,6 +250,7 @@ class AIManager:
                 model=self.ollama_model,
                 messages=self.conversation_history,
                 options=self._ollama_options(),
+                **({"think": True} if self.think_mode else {"think": False}),
             )
             
             bot_response = response['message']['content']
@@ -332,12 +334,16 @@ class AIManager:
 
             def _process_stream(use_think: bool):
                 """Run the stream loop. Returns True on success, raises on real errors."""
+                
+                # Combine use_think parameter with self.think_mode
+                actual_think = use_think and self.think_mode
+                
                 stream = ollama.chat(
                     model=self.ollama_model,
                     messages=self.conversation_history,
                     stream=True,
                     options=self._ollama_options(),
-                    **({"think": True} if use_think else {}),
+                    **({"think": True} if actual_think else {"think": False}),
                 )
                 for chunk in stream:
                     # Capture token stats from the final 'done' chunk

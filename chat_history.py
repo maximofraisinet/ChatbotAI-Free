@@ -55,6 +55,7 @@ def generate_chat_title(user_message: str, model: Optional[str] = None) -> str:
                     ),
                 }
             ],
+            think=False,
         )
         title = resp["message"]["content"].strip().strip('"').strip("'")
         # Limit to 60 chars just in case
